@@ -16,6 +16,8 @@ tilesDir = '/eodc/private/boku/ACube2/tiles'
 overviewsDir = '/eodc/private/boku/ACube2/overviews'
 # directory storing models data
 modelsDir = '/eodc/private/boku/ACube2/models'
+# directory storing files organized for a rasdaman input
+rasdamanDir = '/eodc/private/boku/ACube2/upload'
 # raw images cache file path template (see `?getCachePath`)
 cacheTmpl = '/eodc/private/boku/ACube2/cache/{region}_{dateFrom}_{dateTo}_{cloudCovMax}_{bands}'
 
@@ -128,10 +130,10 @@ tilePeriodBands = list(
   '1 year' = c(
     'DOYMAXNDVI2', 'N2',
     'NDVI2q05',  'NDVI2q50',  'NDVI2q98',
-    'NDTI2q05',  'NDTI2q50',  'NDTI2q98', 
-    'MNDWI2q05', 'MNDWI2q50', 'MNDWI2q98', 
-    'NDBI2q05',  'NDBI2q50',  'NDBI2q98', 
-    'BSI2q05',   'BSI2q50',   'BSI2q98', 
+    'NDTI2q05',  'NDTI2q50',  'NDTI2q98',
+    'MNDWI2q05', 'MNDWI2q50', 'MNDWI2q98',
+    'NDBI2q05',  'NDBI2q50',  'NDBI2q98',
+    'BSI2q05',   'BSI2q50',   'BSI2q98',
     'BLFEI2q05', 'BLFEI2q50', 'BLFEI2q98'
   )
 )

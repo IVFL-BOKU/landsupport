@@ -7,9 +7,10 @@ periodsDir = '/home/zozlak/roboty/BOKU/cube/data/periods'
 tilesDir = '/home/zozlak/roboty/BOKU/cube/data/tiles'
 overviewsDir = '/home/zozlak/roboty/BOKU/cube/data/overviews'
 modelsDir = '/home/zozlak/roboty/BOKU/cube/data/models'
+rasdamanDir = '/home/zozlak/roboty/BOKU/cube/data/upload'
 cacheTmpl = '/home/zozlak/roboty/BOKU/cube/data/cache/{region}_{dateFrom}_{dateTo}_{cloudCovMax}_{bands}'
 
-bands = c('B02', 'B03', 'B04', 'B08', 'B8A', 'B11', 'B12', 'SCL', 'LAI', 'TCI')
+bands = c('B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B8A', 'B11', 'B12', 'SCL', 'LAI', 'TCI', 'FAPAR', 'FCOVER')
 cloudCov = 0.4
 nCores = 6
 chunksPerCore = 10
