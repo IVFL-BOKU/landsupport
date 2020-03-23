@@ -13,6 +13,8 @@ library(dplyr, quietly = TRUE, warn.conflicts = FALSE)
 S2_initialize_user(args['user'], args['pswd'])
 
 images = getImages(args['region'], args['from'], args['to'], cloudCov, rawDir, bands)
+images = images %>%
+  mutate(url = sub('/image/([0-9]+)$', '/imageRaw/\\1', url))
 cacheFile = getCachePath(cacheTmpl, args['region'], args['from'], args['to'], cloudCov, bands)
 invisible(createDirs(cacheFile))
 write.csv(images, cacheFile, row.names = FALSE)
