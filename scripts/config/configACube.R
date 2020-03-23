@@ -11,7 +11,7 @@ acubeLogsDir = '/eodc/private/boku/ACube_logs'
 
 bands = c('B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B8A', 'B11', 'B12', 'TCI', 'LAI', 'FAPAR', 'FCOVER', 'SCL')
 cloudCov = 0.5
-nCores = 10
+nCores = 40
 chunksPerCore = 10
 
 dwnldMethod = 'symlink'
