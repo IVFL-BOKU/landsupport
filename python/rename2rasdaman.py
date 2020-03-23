@@ -9,6 +9,8 @@ import re
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataDir', default='/eodc/private/boku/ACube2/tiles', help='directory containing tiles subdirs')
 parser.add_argument('--targetDir', default='/eodc/private/boku/ACube2/upload', help='base directory for band name-based rasdaman collection subdirs')
+parser.add_argument('--dateFrom', default='1900-01-01')
+parser.add_argument('--dateTo', default='3000-01-01')
 parser.add_argument('match', help='string to be matched against raster file names (typically a band name, sometimes combined with a period indication, e.g. "NDVI2q98" or "m1_DOYMAXNDVI2")')
 parser.add_argument('--tiles', nargs='*', default=[])
 args = parser.parse_args()
@@ -34,6 +36,8 @@ for utm in utms:
                 period = 'none'
 
             date = re.sub('^([0-9]+(-[0-9]+)?(-[0-9]+)?).*$', '\\1', date)
+            if date > args.dateTo or date < args.dateFrom:
+                continue
             if len(date) == 4:
                 date += '-01'
             if len(date) == 7:
