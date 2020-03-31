@@ -46,31 +46,36 @@ writeLines(tiles$tile, tilesFile)
 bands = c(tileRawBands, unlist(tilePeriodBands))
 passed = logical(length(bands)) %>%
   setNames(bands)
-rasDirs = character(length(bands)) %>%
+dirNames = sprintf('/%s%s_%s_%s_%s', rasdamanPrefix, bands, args['region'], args['from'], args['to']) %>%
   setNames(bands)
 for (i in bands) {
-  rasDirs[i] = sprintf('%s/%s_%s_%s_%s', rasdamanDir, i, args['region'], args['from'], args['to'])
   cmd = sprintf(
     'python3 %s --dataDir %s --dateFrom %s --dateTo %s --tilesFile %s %s %s',
     shQuote(paste0(cubeRpath, '/python/rename2rasdaman.py')), shQuote(tilesDir), 
     shQuote(args['from']), shQuote(args['to']),
     shQuote(tilesFile),
-    shQuote(i), shQuote(rasDirs[i])
+    shQuote(i), shQuote(paste0(rasdamanRasterDirHost, dirNames[i]))
   )
-  res = system(cmd, ignore.stdout = TRUE)
-  passed[i] = res == 0
+  cat(cmd, '\n')
+  #res = system(cmd, ignore.stdout = TRUE)
+  #passed[i] = res == 0
 }
 unlink(tilesFile)
 
+ingDirs = character(length(bands)) %>%
+  setNames(bands)
 for (i in bands) {
+  ingDirs[i] = sprintf('%s/%s%s_%s_%s_%s', rasdamanIngredientDir, rasdamanPrefix, i, args['region'], args['from'], args['to'])
   cmd = sprintf(
-    'python3 %s --serviceUrl %s --tmpDir %s --crsResolver %s %s %s',
+    'python3 %s --serviceUrl %s --tmpDir %s --crsResolver %s --targetFile %s %s %s',
     shQuote(paste0(cubeRpath, '/python/createIngredient.py')), 
     shQuote(rasdamanUrl), shQuote(rasdamanTmpDir), shQuote(rasdamanCrsUrl),
-    shQuote(rasDirs[i]), shQuote(i) 
+    shQuote(paste0(rasdamanIngredientDir, dirNames[i], dirNames[i], '.json')),
+    shQuote(paste0(rasdamanRasterDirContainer, dirNames[i])), shQuote(paste0(rasdamanPrefix, i)) 
   )
-  res = system(cmd, ignore.stdout = TRUE)
-  passed[i] = res == 0 & passed[i]
+  cat(cmd, '\n')
+  #res = system(cmd, ignore.stdout = TRUE)
+  #passed[i] = res == 0 & passed[i]
 }
 
-cat(sprintf('%d/%d/%d\ttotal/ok/processed\n', length(passed), sum(passed), length(passed)))
+#cat(sprintf('%d/%d/%d\ttotal/ok/processed\n', length(passed), sum(passed), length(passed)))

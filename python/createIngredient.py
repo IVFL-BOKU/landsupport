@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import argparse
 import os
 
@@ -48,6 +49,8 @@ targetFile = args.targetFile
 if targetFile is None:
     targetFile = args.dataDir + '.json'
 
+if not os.path.isdir(os.path.dirname(targetFile)):
+    os.makedirs(os.path.dirname(targetFile), 0o770)
 with open(targetFile, 'w') as f:
     f.write(tmpl.format(
         serviceUrl=args.serviceUrl, tmpDir=args.tmpDir, dataDir=args.dataDir, 

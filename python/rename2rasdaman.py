@@ -6,10 +6,11 @@ import re
 
 
 parser = argparse.ArgumentParser(description='Creates a directory with rasdaman import-ready files structure by creating symlinks to the cubeR native file structure.')
-parser.add_argument('--dataDir', default='/eodc/private/boku/ACube2/tiles', help='directory containing tiles subdirs')
+parser.add_argument('--dataDir', default='/media/GFTP/landsupport/cubeR/tiles/', help='directory containing tiles subdirs')
 parser.add_argument('--dateFrom', default='1900-01-01')
 parser.add_argument('--dateTo', default='3000-01-01')
 parser.add_argument('--tilesFile', help='path to a file storing a list of tiles to be processed (one per line)')
+parser.add_argument('--tiles', help='comma-separated list of tiles to be processed')
 parser.add_argument('band', help='name of a band to be processed')
 parser.add_argument('targetDir', help='directory to write symbolic links to')
 args = parser.parse_args()
@@ -21,6 +22,8 @@ if args.tilesFile is not None:
     with open(args.tilesFile) as f:
         tiles = f.readlines()
     tiles = [x.strip() for x in tiles]
+if args.tiles is not None:
+    tiles += args.tiles.split(',')
 
 if not os.path.exists(args.targetDir):
     os.makedirs(args.targetDir, 0o770)
@@ -31,6 +34,8 @@ except: ext = 'tif'
 
 utms = os.listdir(args.dataDir)
 utms.sort()
+if len(tiles) > 0:
+  utms = [x for x in utms if x in tiles]
 targetPaths = []
 for utm in utms:
     if not os.path.isdir(os.path.join(args.dataDir, utm)):
