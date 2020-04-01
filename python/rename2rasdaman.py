@@ -30,7 +30,7 @@ if not os.path.exists(args.targetDir):
 
 ext = None
 try: import gdal
-except: ext = 'tif'
+except: ext = '.tif'
 
 utms = os.listdir(args.dataDir)
 utms.sort()
