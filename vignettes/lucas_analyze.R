@@ -9,82 +9,17 @@ library(mlr3tuning)
 library(paradox)
 future::plan('multiprocess', workers = 6)
 
-load('../data/shapes/lucas/extracted_FR-AU_2018.RData')
-data = as_tibble(data) %>% select(-geometry)
-data = data[rowSums(is.na(data)) < ncol(data) - 7, ]
-# 337k points but some of them are poorly geolocated
-lucas = readr::read_csv('../data/shapes/lucas/EU_2018_190611.csv', guess_max = 300000)
-# only 63k points
-lucas = sf::read_sf('../data/shapes/lucas/EU_2018_190611_CPRNC_G_3035_LAEAgridID_QB_NDVI_IMP2015_CLC2018_dec.shp')[, 1:98] %>% rename(point_id = POINT_I) %>% sf::st_transform(sf::st_crs(4326))
-mapping = openxlsx::read.xlsx('../data/shapes/lucas/LUCAS crop types.xlsx')
-lucas = lucas %>% inner_join(mapping) # skips undefined landcover but such observations are useless anyway
-names(lucas) = tolower(names(lucas))
-lucas = lucas %>% inner_join(data)
-names(lucas) = tolower(names(lucas))
-rm(data)
-sf::st_write(lucas, '../data/shapes/lucas/lucas_with_extracted.geojson')
-names(lucas) = gsub('-', '.', names(lucas))
+# from lucac_prepare_data.R
+load('../data/shapes/lucas/merged_EU_2018.RData')
 
-dataWs = lucas %>% as_tibble() %>% select(-geometry) %>% filter(!is.na(winter))
-nas = tibble(
-  col = names(dataWs),
-  sat = !names(dataWs) %in% names(dataWs)[1:107],
-  pna = 100 * colSums(is.na(dataWs)) / nrow(dataWs)
-) %>%
-  mutate(
-    month = if_else(grepl('-[0-9][0-9]m1', col), suppressWarnings(as.integer(sub('^.*-([0-9]+)m1$', '\\1', col))), NA_integer_),
-  ) %>%
-  mutate(
-    month = if_else(sat & grepl('y1$', col), 0L, month)
-  )
-tibble(na = 100 * colSums(is.na(dataWs)) / nrow(dataWs)) %>% ggplot(aes(x = na)) + geom_histogram() + ggtitle('number of variables with a given percentage of missing values')
-### BASE MODEL
-100 * table(dataWs$winter, dataWs$ws_2018y1) / nrow(dataWs) # 68% of correct classifications - not so bad for such a naive model
-# data
-dataWs$winterF = factor(dataWs$winter)
-colsBasic = c('winterF', 'doymaxndvi2_2018y1', 'rain_1900.01.01', 'temp_1900.01.01')
-colsYearly = c('winterF', 'doymaxndvi2_2018y1', 'rain_1900.01.01', 'temp_1900.01.01', 'ndvi2q05_2018y1', 'ndvi2q50_2018y1', 'ndvi2q98_2018y1', 'ndti2q05_2018y1', 'ndti2q50_2018y1', 'ndti2q98_2018y1', 'mndwi2q05_2018y1', 'mndwi2q50_2018y1', 'mndwi2q98_2018y1', 'ndbi2q05_2018y1', 'ndbi2q50_2018y1', 'ndbi2q98_2018y1', 'bsi2q05_2018y1', 'bsi2q50_2018y1', 'bsi2q98_2018y1', 'blfei2q05_2018y1', 'blfei2q50_2018y1', 'blfei2q98_2018y1')
-colsMonthlyMayAug = c('winterF', 'rain_1900.01.01', 'temp_1900.01.01', 'lai2_2018.05m1', 'lai2_2018.06m1', 'lai2_2018.07m1', 'lai2_2018.08m1', 'ndvi2_2018.05m1', 'ndvi2_2018.06m1', 'ndvi2_2018.07m1', 'ndvi2_2018.08m1', 'fapar2_2018.05m1', 'fapar2_2018.06m1', 'fapar2_2018.07m1', 'fapar2_2018.08m1', 'fcover2_2018.05m1', 'fcover2_2018.06m1', 'fcover2_2018.07m1', 'fcover2_2018.08m1')
-colsAll = c('winterF', 'doymaxndvi2_2018y1', 'rain_1900.01.01', 'temp_1900.01.01', 'ndvi2q05_2018y1', 'ndvi2q50_2018y1', 'ndvi2q98_2018y1', 'ndti2q05_2018y1', 'ndti2q50_2018y1', 'ndti2q98_2018y1', 'mndwi2q05_2018y1', 'mndwi2q50_2018y1', 'mndwi2q98_2018y1', 'ndbi2q05_2018y1', 'ndbi2q50_2018y1', 'ndbi2q98_2018y1', 'bsi2q05_2018y1', 'bsi2q50_2018y1', 'bsi2q98_2018y1', 'blfei2q05_2018y1', 'blfei2q50_2018y1', 'blfei2q98_2018y1', 'lai2_2018.05m1', 'lai2_2018.06m1', 'lai2_2018.07m1', 'lai2_2018.08m1', 'ndvi2_2018.05m1', 'ndvi2_2018.06m1', 'ndvi2_2018.07m1', 'ndvi2_2018.08m1', 'fapar2_2018.05m1', 'fapar2_2018.06m1', 'fapar2_2018.07m1', 'fapar2_2018.08m1', 'fcover2_2018.05m1', 'fcover2_2018.06m1', 'fcover2_2018.07m1', 'fcover2_2018.08m1')
-dataBasic         = TaskClassif$new(id = 'WinterSummerBasic',         target = 'winterF', backend = dataWs %>% select(!!colsBasic) %>% filter(rowSums(is.na(.)) == 0))
-dataYearly        = TaskClassif$new(id = 'WinterSummerYearly',        target = 'winterF', backend = dataWs %>% select(!!colsYearly) %>% filter(rowSums(is.na(.)) == 0))
-dataMonthlyMayAug = TaskClassif$new(id = 'WinterSummerMonthlyMayAug', target = 'winterF', backend = dataWs %>% select(!!colsMonthlyMayAug) %>% filter(rowSums(is.na(.)) == 0))
-dataAll           = TaskClassif$new(id = 'WinterSummerAll',           target = 'winterF', backend = dataWs %>% select(!!colsAll) %>% filter(rowSums(is.na(.)) == 0))
-validCount = tibble(
-  task_id = c('WinterSummerBasic', 'WinterSummerYearly', 'WinterSummerMonthlyMayAug', 'WinterSummerAll'),
-  valid_obs = c(dataBasic$nrow, dataYearly$nrow, dataMonthlyMayAug$nrow, dataAll$nrow) / nrow(dataWs)
-)
-# learners
-learnForest = lrn('classif.ranger', predict_type = 'prob')
-learnBayes = lrn('classif.naive_bayes', predict_type = 'prob')
-learnLog = lrn('classif.log_reg', predict_type = 'prob')
-# sampler
-sampler = rsmp('cv', folds = 5)
-# design
-design = benchmark_grid(
-  tasks = list(dataBasic, dataYearly, dataMonthlyMayAug, dataAll),
-  learners = list(learnForest, learnBayes, learnLog),
-  resamplings = sampler
-)
-results = benchmark(design)
-results$aggregate(list(msr('classif.acc'))) %>% inner_join(validCount) %>% arrange(desc(classif.acc))
-autoplot(results, type = 'roc')
-results$resample_result(1)$predictions()
-modelsWs = list(
-  # prefer learnForest because it's faster, the accuracy is only marginally lower and svm caused troubles with predictions on full raster data
-  list(learner = learnForest$train(dataAll), cols = colsAll[-1], levels = levels(dataWs$winterF)),
-  list(learner = learnForest$train(dataYearly), cols = colsYearly[-1], levels = levels(dataWs$winterF))
-)
-save(modelsWs, file = '/eodc/private/boku/ACube2/models/ML/ws.RData')
-
-# all classes
+#### all classes ####
 dataCl = lucas %>% as_tibble() %>% select(-geometry) %>% filter(!is.na(classname))
 dataCl$classnameF = factor(dataCl$classname)
 dataCl %>% group_by(classname) %>% summarize(n = n(), p = 100 * n() / nrow(.)) %>% arrange(n) %>% print(n = 100)
 dataCl = dataCl %>% group_by(classname) %>% filter(n() >= 100) %>% ungroup()
 dataCl$classnameF = factor(as.character(dataCl$classname))
 dataCl$lc_1900.01.01 = factor(dataCl$lc_1900.01.01)
-# features selection
+#### features selection ####
 cols = list(
   colsBenchmark = c('classnameF', 'lc_1900.01.01'),
   colsYearly = c('classnameF', 'lc_1900.01.01', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataCl), value = TRUE)),
@@ -111,7 +46,7 @@ validCount = tibble(
   arrange(desc(valid_obs)) %>%
   mutate(drop = valid_obs - lag(valid_obs))
 validCount
-# fetures selection - features ranking
+#### fetures selection - features ranking ####
 selectForest = lrn('classif.ranger', importance = 'impurity', respect.unordered.factors = 'order')
 resamplerCv = rsmp('cv', folds = 5)
 features = lapply(data[-1], function(x){
@@ -137,7 +72,7 @@ featuresRanking = features %>%
 featuresRanking %>% print(n = 40)
 
 
-# fetures selection - models ranking
+#### fetures selection - models ranking ####
 learnForest = lrn('classif.ranger', predict_type = 'prob', respect.unordered.factors = 'order')
 minDiff = 0.002
 tmpValidObs = 1
@@ -184,7 +119,7 @@ modelsCl = list(
 )
 save(modelsCl, file = '/eodc/private/boku/ACube2/models/ML/cl.RData')
 
-# hyperparameters tuning
+#### hyperparameters tuning ####
 tunerForest = AutoTuner$new(
   learner = learnForest,
   resampling = rsmp('cv', folds = 3),
@@ -216,3 +151,56 @@ results2 = benchmark(design)
 # improvment on a 4th digit - negligible
 results2$aggregate(list(msr('classif.acc'))) %>% inner_join(validCount) %>% arrange(desc(valid_obs), desc(classif.acc))
 results$aggregate(list(msr('classif.acc'))) %>% inner_join(validCount) %>% filter(learner_id %in% c('classif.ranger', 'classif.svm') & task_id %in% c('cropYearly', 'cropAll')) %>% arrange(desc(valid_obs), desc(classif.acc))
+
+#### WINTER SUMMER ####
+dataWs = lucas %>% as_tibble() %>% select(-geometry) %>% filter(!is.na(winter))
+nas = tibble(
+  col = names(dataWs),
+  sat = !names(dataWs) %in% names(dataWs)[1:107],
+  pna = 100 * colSums(is.na(dataWs)) / nrow(dataWs)
+) %>%
+  mutate(
+    month = if_else(grepl('-[0-9][0-9]m1', col), suppressWarnings(as.integer(sub('^.*-([0-9]+)m1$', '\\1', col))), NA_integer_),
+  ) %>%
+  mutate(
+    month = if_else(sat & grepl('y1$', col), 0L, month)
+  )
+tibble(na = 100 * colSums(is.na(dataWs)) / nrow(dataWs)) %>% ggplot(aes(x = na)) + geom_histogram() + ggtitle('number of variables with a given percentage of missing values')
+#### base model ####
+100 * table(dataWs$winter, dataWs$ws_2018y1) / nrow(dataWs) # 68% of correct classifications - not so bad for such a naive model
+# data
+dataWs$winterF = factor(dataWs$winter)
+colsBasic = c('winterF', 'doymaxndvi2_2018y1', 'rain_1900.01.01', 'temp_1900.01.01')
+colsYearly = c('winterF', 'doymaxndvi2_2018y1', 'rain_1900.01.01', 'temp_1900.01.01', 'ndvi2q05_2018y1', 'ndvi2q50_2018y1', 'ndvi2q98_2018y1', 'ndti2q05_2018y1', 'ndti2q50_2018y1', 'ndti2q98_2018y1', 'mndwi2q05_2018y1', 'mndwi2q50_2018y1', 'mndwi2q98_2018y1', 'ndbi2q05_2018y1', 'ndbi2q50_2018y1', 'ndbi2q98_2018y1', 'bsi2q05_2018y1', 'bsi2q50_2018y1', 'bsi2q98_2018y1', 'blfei2q05_2018y1', 'blfei2q50_2018y1', 'blfei2q98_2018y1')
+colsMonthlyMayAug = c('winterF', 'rain_1900.01.01', 'temp_1900.01.01', 'lai2_2018.05m1', 'lai2_2018.06m1', 'lai2_2018.07m1', 'lai2_2018.08m1', 'ndvi2_2018.05m1', 'ndvi2_2018.06m1', 'ndvi2_2018.07m1', 'ndvi2_2018.08m1', 'fapar2_2018.05m1', 'fapar2_2018.06m1', 'fapar2_2018.07m1', 'fapar2_2018.08m1', 'fcover2_2018.05m1', 'fcover2_2018.06m1', 'fcover2_2018.07m1', 'fcover2_2018.08m1')
+colsAll = c('winterF', 'doymaxndvi2_2018y1', 'rain_1900.01.01', 'temp_1900.01.01', 'ndvi2q05_2018y1', 'ndvi2q50_2018y1', 'ndvi2q98_2018y1', 'ndti2q05_2018y1', 'ndti2q50_2018y1', 'ndti2q98_2018y1', 'mndwi2q05_2018y1', 'mndwi2q50_2018y1', 'mndwi2q98_2018y1', 'ndbi2q05_2018y1', 'ndbi2q50_2018y1', 'ndbi2q98_2018y1', 'bsi2q05_2018y1', 'bsi2q50_2018y1', 'bsi2q98_2018y1', 'blfei2q05_2018y1', 'blfei2q50_2018y1', 'blfei2q98_2018y1', 'lai2_2018.05m1', 'lai2_2018.06m1', 'lai2_2018.07m1', 'lai2_2018.08m1', 'ndvi2_2018.05m1', 'ndvi2_2018.06m1', 'ndvi2_2018.07m1', 'ndvi2_2018.08m1', 'fapar2_2018.05m1', 'fapar2_2018.06m1', 'fapar2_2018.07m1', 'fapar2_2018.08m1', 'fcover2_2018.05m1', 'fcover2_2018.06m1', 'fcover2_2018.07m1', 'fcover2_2018.08m1')
+dataBasic         = TaskClassif$new(id = 'WinterSummerBasic',         target = 'winterF', backend = dataWs %>% select(!!colsBasic) %>% filter(rowSums(is.na(.)) == 0))
+dataYearly        = TaskClassif$new(id = 'WinterSummerYearly',        target = 'winterF', backend = dataWs %>% select(!!colsYearly) %>% filter(rowSums(is.na(.)) == 0))
+dataMonthlyMayAug = TaskClassif$new(id = 'WinterSummerMonthlyMayAug', target = 'winterF', backend = dataWs %>% select(!!colsMonthlyMayAug) %>% filter(rowSums(is.na(.)) == 0))
+dataAll           = TaskClassif$new(id = 'WinterSummerAll',           target = 'winterF', backend = dataWs %>% select(!!colsAll) %>% filter(rowSums(is.na(.)) == 0))
+validCount = tibble(
+  task_id = c('WinterSummerBasic', 'WinterSummerYearly', 'WinterSummerMonthlyMayAug', 'WinterSummerAll'),
+  valid_obs = c(dataBasic$nrow, dataYearly$nrow, dataMonthlyMayAug$nrow, dataAll$nrow) / nrow(dataWs)
+)
+# learners
+learnForest = lrn('classif.ranger', predict_type = 'prob')
+learnBayes = lrn('classif.naive_bayes', predict_type = 'prob')
+learnLog = lrn('classif.log_reg', predict_type = 'prob')
+# sampler
+sampler = rsmp('cv', folds = 5)
+# design
+design = benchmark_grid(
+  tasks = list(dataBasic, dataYearly, dataMonthlyMayAug, dataAll),
+  learners = list(learnForest, learnBayes, learnLog),
+  resamplings = sampler
+)
+results = benchmark(design)
+results$aggregate(list(msr('classif.acc'))) %>% inner_join(validCount) %>% arrange(desc(classif.acc))
+autoplot(results, type = 'roc')
+results$resample_result(1)$predictions()
+modelsWs = list(
+  # prefer learnForest because it's faster, the accuracy is only marginally lower and svm caused troubles with predictions on full raster data
+  list(learner = learnForest$train(dataAll), cols = colsAll[-1], levels = levels(dataWs$winterF)),
+  list(learner = learnForest$train(dataYearly), cols = colsYearly[-1], levels = levels(dataWs$winterF))
+)
+save(modelsWs, file = '/eodc/private/boku/ACube2/models/ML/ws.RData')
