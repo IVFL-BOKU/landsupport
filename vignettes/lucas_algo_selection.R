@@ -2,6 +2,7 @@ library(mlr3)
 library(mlr3learners)
 library(dplyr)
 library(ggplot2)
+devtools::load_all()
 future::plan('multiprocess', workers = 4)
 load('../data/shapes/lucas/merged_EU_2018.RData')
 
