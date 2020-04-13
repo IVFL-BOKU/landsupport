@@ -1,10 +1,10 @@
 library(mlr3)
 library(mlr3learners)
-library(dplyr)
-library(ggplot2)
-devtools::load_all()
-future::plan('multiprocess', workers = 4)
-load('../data/shapes/lucas/merged_EU_2018.RData')
+library(dplyr, quietly = TRUE, warn.conflicts = FALSE)
+library(doParallel, quietly = TRUE)
+source('R/extractPredictions.R')
+#future::plan('multiprocess', workers = 24)
+load('vignettes/merged_EU_2018.RData')
 
 #### data preparation ####
 dataCl = lucas %>%
@@ -39,18 +39,11 @@ validCount = tibble(
 validCount
 
 #### benchmark_grid ####
-results = list()
-for (i in c('classif.naive_bayes', 'classif.kknn', 'classif.xgboost', 'classif.lda', 'classif.ranger', 'classif.svm')) {
-  try({
-    results[[length(results) + 1]] = benchmark(benchmark_grid(
-      data,
-      list(lrn(i)),
-      list(rsmp('holdout', ratio = 0.66), rsmp('holdout', ratio = 0.66), rsmp('holdout', ratio = 0.66))
-    ))
-    save(results, file = paste0('vignettes/lucas_algo_selection.RData'))
-  })
-}
-pred = bind_rows(lapply(results, extractPredictions))
+learners = lapply(c('classif.naive_bayes', 'classif.kknn', 'classif.xgboost', 'classif.lda', 'classif.ranger', 'classif.svm'), function(x){lrn(x)})
+results = benchmark(benchmark_grid(data, learners, list(rsmp('holdout', ratio = 0.66), rsmp('holdout', ratio = 0.66), rsmp('holdout', ratio = 0.66))))
+print('saving')
+save(results, file = 'vignettes/lucas_algo_selection.RData')
+pred = extractPredictions(results)
 pred %>%
   group_by(task, learner) %>%
   summarize(accuracy = sum(truth == response) / n()) %>%

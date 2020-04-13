@@ -1,8 +1,8 @@
 # a quick & dirty script for computing classifications (winter/summer, multiple classes) based on tilesDir content
-# - it is assumed that the modelFile contains two models - the best one (requiring more data) and a fallback one (covering >99.9 of area)
+# - it is assumed that the modelFile contains three models sorted from most to less precise one
 # - for performance reasons (1000 times speedup) it's better to read whole rasters at once but it makes the script very memory hungry
 #   so choose the number of threads carefully
-modelFile = '/eodc/private/boku/ACube2/models/ML/cl.RData'
+modelFile = 'vignettes/lucas_features_selection_models.RData'
 tilesDir = '/eodc/private/boku/ACube2/tiles'
 tmpDir = '/eodc/private/boku/ACube2/tmp'
 year = 2018
@@ -14,10 +14,6 @@ cubeRpath = '/eodc/private/boku/software/cubeR'
 skipExisting = TRUE
 
 args = commandArgs(TRUE)
-#if (length(args) < 4) {
-#  stop('This scripts takes parameters: settingsFilePath regionId dateFrom dateTo')
-#}
-#names(args) = c('cfgFile', 'region', 'from', 'to')
 t0 = Sys.time()
 cat(paste0(c('Running classify.R', args, as.character(Sys.time()), '\n'), collapse = '\t'))
 
@@ -30,19 +26,25 @@ library(doParallel, quietly = TRUE)
 e = new.env()
 load(modelFile, envir = e)
 models = get(ls(envir = e)[1], envir = e)
-models[[1]]$learner$predict_type = models[[2]]$learner$predict_type = 'prob'
-models[[1]]$learner$param_set$values$num.threads = models[[2]]$learner$param_set$values$num.threads = learnerNumThreads
+models = lapply(models, function(x) {
+  x$learner$predict_type = 'prob'
+  x$learner$param_set$values$num.threads = learnerNumThreads
+  x
+})
 
-cols = lapply(models, function(x){dplyr::tibble(var = x$cols)}) %>%
+cols = lapply(models, function(x) {dplyr::tibble(var = x$cols)}) %>%
   dplyr::bind_rows() %>%
   dplyr::distinct() %>%
+  dplyr::mutate(var  = gsub('-', '.', .data$var)) %>%
   dplyr::mutate(var2 = gsub('[.]', '-', .data$var)) %>%
   tidyr::separate(.data$var2, c('band', 'date'), sep = '_') %>%
   dplyr::mutate(band = sub('Q([0-9]{2})', 'q\\1', toupper(.data$band)))
 
 registerDoParallel()
 options(cores = nCores)
-tiles = setdiff(list.dirs(tilesDir, full.names = FALSE), '')
+tiles = list.dirs(tilesDir, full.names = FALSE, recursive = FALSE)
+tiles = tiles[nchar(tiles) == 6]
+tiles = c(c('E47N27', 'E47N28', 'E48N27', 'E48N28', 'E46N19', 'E46N20', 'E47N19', 'E47N20'), tiles) # Marchfeld and Naples first
 output = foreach(tls = tiles, .combine = bind_rows) %dopar% {
   cat(tls, '\n', sep = '')
 
@@ -66,8 +68,8 @@ output = foreach(tls = tiles, .combine = bind_rows) %dopar% {
       }
       input = dplyr::as_tibble(input) %>%
         dplyr::mutate(
-          .dummy = factor(rep_len(models[[1]]$levels, n())),
-          block = as.integer(row_number() / blockSize)
+          .dummy = rep_len(factor(models[[1]]$levels), n()),
+          block = as.integer((row_number() - 1L) / blockSize)
         )
       cat(tls, ' input data read', sep = '')
 
@@ -82,6 +84,7 @@ output = foreach(tls = tiles, .combine = bind_rows) %dopar% {
           )
           mask1 = rowSums(is.na(x[, models[[1]]$cols])) == 0
           mask2 = rowSums(is.na(x[, models[[2]]$cols])) == 0 & !mask1
+          mask3 = rowSums(is.na(x[, models[[3]]$cols])) == 0 & !mask1 & !mask2
           if (sum(mask1) > 0) {
             tmpVal1 = models[[1]]$learner$predict(mlr3::TaskClassif$new('tmp', x[mask1, ], '.dummy'))
             result$class[mask1] = as.integer(tmpVal1$response)
@@ -91,6 +94,11 @@ output = foreach(tls = tiles, .combine = bind_rows) %dopar% {
             tmpVal2 = models[[2]]$learner$predict(mlr3::TaskClassif$new('tmp', x[mask2, ], '.dummy'))
             result$class[mask2] = as.integer(tmpVal2$response)
             result$prob[mask2] = as.integer(100 * apply(tmpVal2$prob, 1, max))
+          }
+          if (sum(mask3) > 0) {
+            tmpVal3 = models[[3]]$learner$predict(mlr3::TaskClassif$new('tmp', x[mask3, ], '.dummy'))
+            result$class[mask3] = as.integer(tmpVal3$response)
+            result$prob[mask3] = as.integer(100 * apply(tmpVal3$prob, 1, max))
           }
           result
         })
