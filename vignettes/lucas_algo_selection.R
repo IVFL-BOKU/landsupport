@@ -19,8 +19,8 @@ dataCl$classnameF = factor(dataCl$classname)
 tibble(col = names(dataCl), p = 100 * colSums(is.na(dataCl)) / nrow(dataCl)) %>% filter(grepl('lai.*m1', col)) %>% arrange(col) %>% print(n = 24)
 cols = list(
   colsBenchmark = c('id', 'classnameF', 'lc_1900.01.01'),
-  colsYearly = c('id', 'classnameF', 'lc_1900.01.01', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataCl), value = TRUE)),
-  cols48 = c('id', 'classnameF', 'lc_1900.01.01', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataCl), value = TRUE), grep('^[fnlb].*_2018.0[45678]m1', names(dataCl), value = TRUE))
+  colsYearly = c('id', 'classnameF', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataCl), value = TRUE)),
+  cols48 = c('id', 'classnameF', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataCl), value = TRUE), grep('^[fnlb].*_2018.0[45678]m1', names(dataCl), value = TRUE))
 )
 data = list()
 for (i in seq_along(cols)) {

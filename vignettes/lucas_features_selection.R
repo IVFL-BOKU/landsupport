@@ -21,15 +21,15 @@ dataClRel$classnameF = factor(dataClRel$classname)
 
 cols = list(
   colsBenchmark = c('id', 'classnameF', 'lc_1900.01.01'),
-  colsYearly = c('id', 'classnameF', 'lc_1900.01.01', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataCl), value = TRUE)),
-  cols58 = c('id', 'classnameF', 'lc_1900.01.01', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataCl), value = TRUE), grep('^[fnlb].*_2018.0[5678]m1', names(dataCl), value = TRUE)),
-  cols48 = c('id', 'classnameF', 'lc_1900.01.01', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataCl), value = TRUE), grep('^[fnlb].*_2018.0[45678]m1', names(dataCl), value = TRUE)),
-  cols59 = c('id', 'classnameF', 'lc_1900.01.01', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataCl), value = TRUE), grep('^[fnlb].*_2018.0[56789]m1', names(dataCl), value = TRUE)),
-  cols49 = c('id', 'classnameF', 'lc_1900.01.01', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataCl), value = TRUE), grep('^[fnlb].*_2018.0[456789]m1', names(dataCl), value = TRUE)),
-  cols38 = c('id', 'classnameF', 'lc_1900.01.01', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataCl), value = TRUE), grep('^[fnlb].*_2018.0[345678]m1', names(dataCl), value = TRUE)),
-  rel13 = c('id', 'classnameF', 'lc_1900.01.01', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataClRel), value = TRUE), grep('^[fnlb].*_2018.1[123]m1', names(dataClRel), value = TRUE)),
-  rel03 = c('id', 'classnameF', 'lc_1900.01.01', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataClRel), value = TRUE), grep('^[fnlb].*_2018.1[0123]m1', names(dataClRel), value = TRUE)),
-  rel04 = c('id', 'classnameF', 'lc_1900.01.01', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataClRel), value = TRUE), grep('^[fnlb].*_2018.1[01234]m1', names(dataClRel), value = TRUE))
+  colsYearly = c('id', 'classnameF', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataCl), value = TRUE)),
+  cols58 = c('id', 'classnameF', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataCl), value = TRUE), grep('^[fnlb].*_2018.0[5678]m1', names(dataCl), value = TRUE)),
+  cols48 = c('id', 'classnameF', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataCl), value = TRUE), grep('^[fnlb].*_2018.0[45678]m1', names(dataCl), value = TRUE)),
+  cols59 = c('id', 'classnameF', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataCl), value = TRUE), grep('^[fnlb].*_2018.0[56789]m1', names(dataCl), value = TRUE)),
+  cols49 = c('id', 'classnameF', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataCl), value = TRUE), grep('^[fnlb].*_2018.0[456789]m1', names(dataCl), value = TRUE)),
+  cols38 = c('id', 'classnameF', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataCl), value = TRUE), grep('^[fnlb].*_2018.0[345678]m1', names(dataCl), value = TRUE)),
+  rel13  = c('id', 'classnameF', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataClRel), value = TRUE), grep('^[fnlb].*_2018.1[123]m1', names(dataClRel), value = TRUE)),
+  rel03  = c('id', 'classnameF', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataClRel), value = TRUE), grep('^[fnlb].*_2018.1[0123]m1', names(dataClRel), value = TRUE)),
+  rel04  = c('id', 'classnameF', 'rain_1900.01.01', 'temp_1900.01.01', grep('^(doy|nd|mn|nd|bs|bl).*_2018y1$', names(dataClRel), value = TRUE), grep('^[fnlb].*_2018.1[01234]m1', names(dataClRel), value = TRUE))
 )
 data = list()
 for (i in seq_along(cols)) {
