@@ -8,8 +8,8 @@ tmpDir = '/eodc/private/boku/ACube2/tmp'
 year = 2018
 outBand = 'CLASS'
 blockSize = 1000000
-learnerNumThreads = 10
-nCores = 3
+learnerNumThreads = 40
+nCores = 1
 cubeRpath = '/eodc/private/boku/software/cubeR'
 skipExisting = TRUE
 
@@ -26,6 +26,7 @@ library(doParallel, quietly = TRUE)
 e = new.env()
 load(modelFile, envir = e)
 models = get(ls(envir = e)[1], envir = e)
+rm(e)
 models = lapply(models, function(x) {
   x$learner$predict_type = 'prob'
   x$learner$param_set$values$num.threads = learnerNumThreads
@@ -44,8 +45,9 @@ registerDoParallel()
 options(cores = nCores)
 tiles = list.dirs(tilesDir, full.names = FALSE, recursive = FALSE)
 tiles = tiles[nchar(tiles) == 6]
-tiles = c(c('E47N27', 'E47N28', 'E48N27', 'E48N28', 'E46N19', 'E46N20', 'E47N19', 'E47N20'), tiles) # Marchfeld and Naples first
-output = foreach(tls = tiles, .combine = bind_rows) %dopar% {
+tiles = c(c('E48N27', 'E48N28', 'E49N27', 'E49N28', 'E46N19', 'E46N20', 'E47N19', 'E47N20'), tiles) # Marchfeld and Naples first
+#output = foreach(tls = tiles, .combine = bind_rows) %dopar% {
+output = foreach(tls = tiles, .combine = bind_rows) %do% {
   cat(tls, '\n', sep = '')
 
   outFiles = getTilePath(tilesDir, tls, paste0(year, 'y1'), paste0(outBand, c('', 'PROB')), 'tif')
