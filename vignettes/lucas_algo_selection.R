@@ -2,7 +2,7 @@ library(mlr3)
 library(mlr3learners)
 library(dplyr, quietly = TRUE, warn.conflicts = FALSE)
 library(doParallel, quietly = TRUE)
-source('R/extractPredictions.R')
+devtools::load_all()
 #future::plan('multiprocess', workers = 24)
 load('vignettes/merged_EU_2018.RData')
 
