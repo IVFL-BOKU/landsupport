@@ -78,3 +78,14 @@ tileResamplingMethod = 'near'
 tileGdalOpts = '--config GDAL_CACHEMAX 4096 -wm 2048 -multi -wo NUM_THREADS=2 -co "COMPRESS=DEFLATE" -co "TILED=YES" -co "BLOCKXSIZE=512" -co "BLOCKYSIZE=512"'
 tileSkipExisting = FALSE
 
+landcoverModelName = 'LC'
+landcoverTrainDataPath = '/home/zozlak/roboty/BOKU/cube/data/shapes/lucas/merged_EU_2018_training.csv'
+landcoverTargetVar = 'classname'
+landcoverFeaturesList = list(
+  'april-august' = c('ndvi2q05_2018y1', 'ndti2q05_2018y1', 'bsi2q98_2018y1', 'blfei2q50_2018y1', 'ndti2q50_2018y1', 'b12_2018.08m1', 'ndvi2q50_2018y1', 'b03_2018.08m1', 'ndbi2q98_2018y1', 'b11_2018.08m1', 'b05_2018.08m1', 'b04_2018.08m1', 'blfei2q05_2018y1', 'bsi2q50_2018y1', 'b02_2018.08m1', 'b03_2018.07m1', 'ndti2q98_2018y1', 'b05_2018.07m1', 'b12_2018.07m1', 'ndvi2_2018.08m1', 'b03_2018.06m1', 'b04_2018.07m1', 'b11_2018.07m1', 'b02_2018.07m1', 'mndwi2q50_2018y1', 'b05_2018.06m1', 'b12_2018.05m1', 'b04_2018.06m1', 'ndvi2_2018.07m1', 'b03_2018.05m1', 'ndbi2q50_2018y1', 'fcover2_2018.08m1', 'blfei2q98_2018y1', 'b12_2018.06m1', 'fapar2_2018.08m1', 'lai2_2018.08m1', 'b02_2018.06m1', 'lai2_2018.05m1', 'b05_2018.05m1', 'ndbi2q05_2018y1', 'b03_2018.04m1', 'b11_2018.05m1', 'fcover2_2018.05m1', 'b12_2018.04m1', 'ndvi2q98_2018y1', 'b11_2018.06m1', 'ndvi2_2018.06m1', 'lai2_2018.07m1', 'fapar2_2018.05m1', 'mndwi2q05_2018y1', 'fcover2_2018.04m1', 'b05_2018.04m1', 'bsi2q05_2018y1'),
+  'may-august'   = c('ndvi2q05_2018y1', 'bsi2q98_2018y1', 'ndti2q05_2018y1', 'blfei2q50_2018y1', 'ndti2q50_2018y1', 'ndvi2q50_2018y1', 'b12_2018.08m1', 'b03_2018.08m1', 'ndbi2q98_2018y1', 'b11_2018.08m1', 'b05_2018.08m1', 'b04_2018.08m1', 'bsi2q50_2018y1', 'blfei2q05_2018y1', 'b03_2018.07m1', 'b02_2018.08m1', 'ndti2q98_2018y1', 'b05_2018.07m1', 'b12_2018.07m1', 'ndvi2_2018.08m1', 'b03_2018.06m1', 'b04_2018.07m1', 'b11_2018.07m1', 'b02_2018.07m1', 'b03_2018.05m1', 'b05_2018.06m1', 'b04_2018.06m1', 'b12_2018.05m1', 'fcover2_2018.08m1', 'ndvi2_2018.07m1', 'mndwi2q50_2018y1', 'ndbi2q50_2018y1', 'b12_2018.06m1', 'fapar2_2018.08m1', 'lai2_2018.08m1', 'blfei2q98_2018y1', 'lai2_2018.05m1'),
+  'yearly'       = c('ndvi2q05_2018y1', 'blfei2q50_2018y1', 'ndti2q05_2018y1', 'bsi2q98_2018y1', 'ndti2q50_2018y1', 'ndvi2q50_2018y1', 'blfei2q05_2018y1', 'ndbi2q98_2018y1', 'ndti2q98_2018y1', 'bsi2q50_2018y1', 'mndwi2q50_2018y1', 'blfei2q98_2018y1', 'ndvi2q98_2018y1', 'ndbi2q50_2018y1', 'mndwi2q05_2018y1', 'ndbi2q05_2018y1', 'bsi2q05_2018y1', 'doymaxndvi2_2018y1', 'temp_1900.01.01', 'mndwi2q98_2018y1', 'rain_1900.01.01')
+)
+landcoverGdalOpts = '--config GDAL_CACHEMAX 4096 -wm 2048 -multi -wo NUM_THREADS=2 -co "COMPRESS=DEFLATE" -co "TILED=YES" -co "BLOCKXSIZE=512" -co "BLOCKYSIZE=512"'
+landcoverSkipExistingModel = TRUE
+landcoverSkipExisting = TRUE

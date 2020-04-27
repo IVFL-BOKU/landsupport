@@ -135,7 +135,7 @@ truth %>%
   tidyr::pivot_wider(names_from = 'truth', values_from = 'pt') %>%
   arrange(response) %>%
   readr::write_csv('../deliverable 4.2/truth_48.csv', na = '0')
-truth %>%
+truthP48 = truth %>%
   filter(grepl('^cols48', task)) %>%
   group_by(truth) %>%
   summarize(n = sum(n)) %>%
@@ -154,7 +154,7 @@ truth %>%
   ylab('Classification accuracy [%]')
 
 #### final models ####
-bestSets = c(cols48 = 54, cols58 = 38, colsYearly = 22)
+bestSets = c(cols48 = 55, cols58 = 46, colsYearly = 22)
 filter = flt('information_gain')
 models = list()
 for (i in c('cols48', 'cols58', 'colsYearly')) {
