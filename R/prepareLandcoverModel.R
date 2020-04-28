@@ -34,6 +34,7 @@ prepareLandcoverModel = function(targetDir, tmpDir, modelName, trainData, target
         mlr3::as.data.table()
       data = mlr3::TaskClassif$new(id = names(featuresList)[i], target = targetVar, backend = mlr3::DataBackendDataTable$new(data, '.id'))
       learner = mlr3::lrn('classif.ranger')
+      learner$predict_type = 'prob'
       learner$param_set$values = list(num.threads = nCores)
       learner$train(data)
       models[[names(featuresList)[i]]] = list(learner = learner, cols = featuresList[[i]], levels = data$levels()[[targetVar]])

@@ -10,13 +10,14 @@
 #' @param bandName output band name (the classification probability band name
 #'   will be created with a PROB suffix)
 #' @param nCores number of cores used for classification
+#' @param blockSize processing block size
 #' @param skipExisting should already existing tiles be skipped?
 #' @param gdalOpts \code{raster::writeRaster()} parameters used for output
 #'   raster creation
 #' @return dataframe describing created images
 #' @export
 #' @import dplyr
-prepareLandcover = function(input, targetDir, tmpDir, modelFile, bandName, nCores, skipExisting, gdalOpts) {
+prepareLandcover = function(input, targetDir, tmpDir, modelFile, bandName, nCores, blockSize, skipExisting, gdalOpts) {
   input = input %>%
     dplyr::mutate(
       band = bandName,
@@ -68,31 +69,32 @@ prepareLandcover = function(input, targetDir, tmpDir, modelFile, bandName, nCore
     processed = input %>%
       dplyr::group_by(.data$period, .data$tile, .data$band) %>%
       dplyr::do({
-        cat(.data$tile, '\n')
+        d = .data
+        cat(d$tile, '\n')
         processed = FALSE
         try({
           cols = cols %>%
-            dplyr::mutate(tileFile = getTilePath(tilesDir, tls, .data$date, .data$band, 'tif'))
+            dplyr::mutate(tileFile = getTilePath(tilesDir, d$tile, .data$date, .data$band, 'tif'))
           outputClass = raster::raster(raster::raster(cols$tileFile[1]))
           outputProb = raster::raster(outputClass)
 
-          input = vector('list', nrow(cols))
-          names(input) = c(cols$var)
+          inputData = vector('list', nrow(cols))
+          names(inputData) = c(cols$var)
           for (i in seq_along(cols$var)) {
-            input[[i]] = raster::getValues(raster::raster(cols$tileFile[i]))
+            inputData[[i]] = raster::getValues(raster::raster(cols$tileFile[i]))
           }
-          input = dplyr::as_tibble(input) %>%
+          inputData = dplyr::as_tibble(inputData) %>%
             dplyr::mutate(
               .dummy = rep_len(factor(models[[1]]$levels), n()),
               block = as.integer((row_number() - 1L) / blockSize)
             )
-          cat(tls, '\tinput data read', sep = '')
+          cat('\tinput data read\n')
 
-          output = input %>%
+          outputData = inputData %>%
             dplyr::group_by(block) %>%
             dplyr::do({
               x = .data
-              cat('\t block ', x$block[1], '\n')
+              cat('\tblock ', x$block[1], '\n')
               result = dplyr::tibble(
                 class = rep(NA_integer_, nrow(x)),
                 prob = rep(NA_integer_, nrow(x))
@@ -108,18 +110,19 @@ prepareLandcover = function(input, targetDir, tmpDir, modelFile, bandName, nCore
               }
               result
             })
-          raster::values(outputClass) = output$class
-          raster::values(outputProb) = output$prob
+          raster::values(outputClass) = outputData$class
+          raster::values(outputProb) = outputData$prob
 
-          raster::writeRaster(outputClass, .data$tmpFile, datatype = 'INT1U', overwrite = TRUE, options = gdalOpts)
-          raster::writeRaster(outputProb, .data$tmpProbFile, datatype = 'INT1U', overwrite = TRUE, options = gdalOpts)
-          file.rename(c(.data$tmpFile, .data$tmpProbFile), c(.data$outFile, .data$probFile))
+          raster::writeRaster(outputClass, d$tmpFile, datatype = 'INT1U', overwrite = TRUE, options = gdalOpts)
+          raster::writeRaster(outputProb, d$tmpProbFile, datatype = 'INT1U', overwrite = TRUE, options = gdalOpts)
+          file.rename(c(d$tmpFile, d$tmpProbFile), c(d$outFile, d$probFile))
           processed = TRUE
 
         })
-        dplyr::tibble(tileFile = c(.data$outFile, .data$probFile), processed = processed)
+        dplyr::tibble(tileFile = c(d$outFile, d$probFile), processed = processed)
       })
   }
 
   return(dplyr::bind_rows(processed, skipped))
 }
+
