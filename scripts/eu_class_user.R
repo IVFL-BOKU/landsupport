@@ -16,8 +16,6 @@ bandsYearly = c(
   'BSI2q05',   'BSI2q50',   'BSI2q98',
   'BLFEI2q05', 'BLFEI2q50', 'BLFEI2q98'
 )
-bandsMonthly = bandsMonthly[1]
-bandsYearly = bandsYearly[1]
 bands = dplyr::bind_rows(
   dplyr::tibble(band = bandsYearly, month = NA_integer_),
   expand.grid(band = bandsMonthly, month = param$monthMin:param$monthMax, stringsAsFactors = FALSE)

@@ -18,6 +18,11 @@ parser.add_argument('--rasdamanRasterDir', default='/geodata/runs')
 parser.add_argument('--rasterDir', default='/ras_data/runs')
 parser.add_argument('--recipeDir', default='/ras_recipe')
 parser.add_argument('--legendDir', default='/legends')
+parser.add_argument('--monthFrom', type=int, default=4)
+parser.add_argument('--monthTo', type=int, default=10)
+parser.add_argument('--fontSize', type=int, default=10)
+parser.add_argument('--minCoverage', type=int, default=98)
+parser.add_argument('--blockSize', type=int, default=20000)
 parser.add_argument('runId', type=int)
 args = parser.parse_args()
 
@@ -40,16 +45,15 @@ inputParam['rasterDir'] = os.path.join(args.rasterDir, runName)
 inputParam['legendFilePng'] = os.path.join(args.legendDir, runName + '.png')
 inputParam['legendFileJson'] = os.path.join(inputParam['tmpDir'], 'legend.json')
 inputParam['roiFile'] = os.path.join(inputParam['tmpDir'], 'roi.geojson')
-inputParam['minDataCoverage'] = 0.98
 inputParam['validationFile'] = os.path.join(inputParam['tmpDir'], 'validation.json')  # leave empty for no validation
-inputParam['blockSize'] = 20000 # in meters
-inputParam['rasterDir'] = args.rasterDir
+inputParam['minDataCoverage'] = args.minCoverage / 100
+inputParam['blockSize'] = args.blockSize # in meters
+inputParam['monthMin'] = args.monthFrom
+inputParam['monthMax'] = args.monthTo
 inputParam['resx'] = 10 # in meters
 inputParam['resy'] = -10 # in meters
 inputParam['projection'] = 'EPSG:3035'
-inputParam['monthMin'] = 5
-inputParam['monthMax'] = 9
-inputParam['fontSize'] = 10
+inputParam['fontSize'] = args.fontSize
 
 cur.execute(
   """
