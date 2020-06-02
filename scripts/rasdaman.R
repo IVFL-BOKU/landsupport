@@ -56,9 +56,8 @@ for (i in bands) {
     shQuote(tilesFile),
     shQuote(i), shQuote(paste0(rasdamanRasterDirHost, dirNames[i]))
   )
-  cat(cmd, '\n')
-  #res = system(cmd, ignore.stdout = TRUE)
-  #passed[i] = res == 0
+  res = system(cmd, ignore.stdout = TRUE)
+  passed[i] = res == 0
 }
 unlink(tilesFile)
 
@@ -73,9 +72,8 @@ for (i in bands) {
     shQuote(paste0(rasdamanIngredientDir, dirNames[i], dirNames[i], '.json')),
     shQuote(paste0(rasdamanRasterDirContainer, dirNames[i])), shQuote(paste0(rasdamanPrefix, i)) 
   )
-  cat(cmd, '\n')
-  #res = system(cmd, ignore.stdout = TRUE)
-  #passed[i] = res == 0 & passed[i]
+  res = system(cmd, ignore.stdout = TRUE)
+  passed[i] = res == 0 & passed[i]
 }
 
-#cat(sprintf('%d/%d/%d\ttotal/ok/processed\n', length(passed), sum(passed), length(passed)))
+cat(sprintf('%d/%d/%d\ttotal/ok/processed\n', length(passed), sum(passed), length(passed)))
