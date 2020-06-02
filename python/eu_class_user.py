@@ -45,6 +45,7 @@ inputParam['rasterDir'] = os.path.join(args.rasterDir, runName)
 inputParam['legendFilePng'] = os.path.join(args.legendDir, runName + '.png')
 inputParam['legendFileJson'] = os.path.join(inputParam['tmpDir'], 'legend.json')
 inputParam['roiFile'] = os.path.join(inputParam['tmpDir'], 'roi.geojson')
+inputParam['logFile'] = os.path.join(inputParam['tmpDir'], 'log')
 inputParam['validationFile'] = os.path.join(inputParam['tmpDir'], 'validation.json')  # leave empty for no validation
 inputParam['minDataCoverage'] = args.minCoverage / 100
 inputParam['blockSize'] = args.blockSize # in meters

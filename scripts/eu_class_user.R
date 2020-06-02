@@ -7,6 +7,8 @@ options(warn = 1)
 args = commandArgs(TRUE)
 param = jsonlite::read_json(args[1])
 
+sink(param$logFile, split = TRUE)
+
 bandsMonthly = c('NDVI2', 'LAI2', 'FAPAR2', 'FCOVER2', 'B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B8A', 'B11', 'B12')
 bandsYearly = c(
   'NDVI2q05',  'NDVI2q50',  'NDVI2q98',
