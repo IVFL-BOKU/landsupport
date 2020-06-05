@@ -1,11 +1,14 @@
 library(magrittr)
 library(mlr3)
 library(mlr3learners)
+library(doParallel, quietly = TRUE)
 
 options(warn = 1)
+registerDoParallel()
 
 args = commandArgs(TRUE)
 param = jsonlite::read_json(args[1])
+options(cores = param$nCores)
 
 sink(param$logFile, split = TRUE)
 
@@ -39,48 +42,18 @@ trainData = dplyr::bind_rows(lapply(param$referencePoints, dplyr::as_tibble)) %>
     tile = paste0(as.integer(x / param$blockSize), '_', as.integer(y / param$blockSize)),
   )
 
-fetchFeaturesByTile = function(trainData, bands, blockSize) {
-  data = trainData %>%
-    dplyr::group_by(tile) %>%
-    dplyr::do({
-      d = .data
-      for (i in seq_along(bands$band)) {
-        cat('\t', d$tile[1], bands$var[i], '\n')
-        resp = httr::GET(
-          sprintf(
-            '%s?SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage&COVERAGEID=%s&SUBSET=X(%d,%d)&SUBSET=Y(%d,%d)&SUBSET=%s&FORMAT=%s',
-            param$rasdamanUrl, 
-            URLencode(bands$coverage[i]), 
-            as.integer(d$tilex[1]), as.integer(d$tilex[1] + blockSize), as.integer(d$tiley[1]), as.integer(d$tiley[1] + blockSize),
-            URLencode(paste0('ansi("', bands$date[i], 'T00:00:00.000Z")')), 
-            URLencode('image/tiff')
-          )
-        )
-        if (resp$status_code == 200) {
-          tmpFile = paste0(param$tmpDir, '/', param$runId, '.tif')
-          writeBin(httr::content(resp, 'raw'), tmpFile)
-          tmpRast = suppressWarnings(raster::raster(tmpFile))
-          d[, bands$var[i]] = raster::extract(tmpRast, d[, c('x', 'y')])
-        } else {
-          d[, bands$var[i]] = rep(NA_real, nrow(d))
-        }
-      }
-      d[, c('x', 'y', 'label', bands$var)]
-    })
-  return(data)
-}
-
 fetchFeaturesByPoint = function(trainData, bands) {
-  for (i in seq_along(bands$band)) {
-    cat('\t', bands$var[i], '\n')
-    trainData[, bands$var[i]] = purrr::map2_dbl(trainData$x, trainData$y, function(x, y) {
+  trainDataValues = foreach (band = split(bands, seq_along(bands$band)), .combine = dplyr::bind_cols) %dopar% {
+    cat('\t', band$var, '\n')
+    dv = dplyr::tibble(.rows = nrow(trainData))
+    dv[, band$var] = purrr::map2_dbl(trainData$x, trainData$y, function(x, y) {
       resp = httr::GET(
         sprintf(
           '%s?SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage&COVERAGEID=%s&SUBSET=X(%d)&SUBSET=Y(%d)&SUBSET=%s&FORMAT=%s',
           param$rasdamanUrl, 
-          URLencode(paste0(param$coveragePrefix, '_', bands$band[i])), 
+          URLencode(paste0(param$coveragePrefix, '_', band$band)), 
           as.integer(x), as.integer(y), 
-          URLencode(paste0('ansi("', bands$date[i], 'T00:00:00.000Z")')), 
+          URLencode(paste0('ansi("', band$date, 'T00:00:00.000Z")')), 
           URLencode('application/json')
         )
       )
@@ -90,15 +63,11 @@ fetchFeaturesByPoint = function(trainData, bands) {
         return(NA_real_)
       }
     })
+    dv
   }
-  return(trainData)
+  return(dplyr::bind_cols(trainData, trainDataValues))
 }
-
-if (nrow(trainData) < 1000) {
-  trainData = fetchFeaturesByPoint(trainData, bands)
-} else {
-  fetchFeaturesByTile(trainData, bands, 25000) 
-}
+trainData = fetchFeaturesByPoint(trainData, bands)
 
 cat('Training the model\n')
 featuresCoverage = colSums(!is.na(trainData[, -1:-3])) / nrow(trainData)
@@ -160,28 +129,32 @@ while (px <= bbox['xmax']) {
    
     dx = ceiling((ppx - px) / abs(param$resx))
     dy = ceiling((ppy - py) / abs(param$resy))
-    dataBlock = dplyr::tibble(.rows = dx * dy)
-    for (i in seq_along(bands$band)) {
-      cat('\t\tband', bands$var[i], '\n')
+    dataBlock = foreach (band = split(bands, seq_along(bands$band)), .combine = dplyr::bind_cols) %dopar% {
+      dataBlock = dplyr::tibble(.rows = dx * dy)
+      cat('\t\tband', band$var, '\n')
       resp = httr::GET(
         sprintf(
           '%s?SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage&COVERAGEID=%s&SUBSET=X(%d,%d)&SUBSET=Y(%d,%d)&SUBSET=%s&FORMAT=%s',
           param$rasdamanUrl,
-          URLencode(bands$coverage[i]),
+          URLencode(band$coverage),
           as.integer(px), as.integer(ppx), as.integer(py), as.integer(ppy),
-          URLencode(paste0('ansi("', bands$date[i], 'T00:00:00.000Z")')),
+          URLencode(paste0('ansi("', band$date, 'T00:00:00.000Z")')),
           URLencode('image/tiff')
         )
       )
       if (resp$status_code == 200) {
+        tmpFile = paste0(param$tmpDir, '/', param$runId, '_', band$var, '.tif')
         writeBin(httr::content(resp, 'raw'), tmpFile)
         tmpRast = suppressWarnings(raster::raster(tmpFile))
-        dataBlock[, bands$var[i]] = raster::getValues(tmpRast)
-        unlink(tmpFile)
+        dataBlock[, band$var] = raster::getValues(tmpRast)
       } else {
-        dataBlock[, bands$var[i]] = NA_integer
+        dataBlock[, band$var] = NA_integer_
       }
+      dataBlock
     }
+    tmpFiles = paste0(param$tmpDir, '/', param$runId, '_', bands$var, '.tif')
+    tmpRast = suppressWarnings(raster::raster(tmpFiles[1]))
+    unlink(tmpFiles)
 
     cat('\tclassifying\n')
     dataBlock[is.na(dataBlock)] = -100000L
@@ -191,7 +164,7 @@ while (px <= bbox['xmax']) {
       mlr3::as.data.table() %>%
       use_series('response')
     tmpRast = raster::setValues(tmpRast, prediction)
-    targetFile = paste0(param$rasterDir, '/eu_class_user_', param$runId, '/', px, '_', py, '.tif')
+    targetFile = paste0(param$rasterDir, '/', px, '_', py, '.tif')
     dir.create(dirname(targetFile), FALSE, TRUE)
     suppressWarnings(unlink(targetFile))
 

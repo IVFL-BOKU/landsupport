@@ -10,7 +10,7 @@ import subprocess
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dbConf')
-parser.add_argument('--rasdamanUrl', default='http://192.168.30.11:8090/rasdaman/ows')
+parser.add_argument('--rasdamanUrl', default='http://rasdaman:9009/rasdaman/ows')
 parser.add_argument('--coveragePrefix', default='CA')
 parser.add_argument('--tmpDir', default='/cuber/tmp')
 parser.add_argument('--modelDir', default='/cuber')
@@ -23,6 +23,7 @@ parser.add_argument('--monthTo', type=int, default=10)
 parser.add_argument('--fontSize', type=int, default=10)
 parser.add_argument('--minCoverage', type=int, default=98)
 parser.add_argument('--blockSize', type=int, default=20000)
+parser.add_argument('--nCores', type=int, default=8)
 parser.add_argument('runId', type=int)
 args = parser.parse_args()
 
@@ -51,6 +52,7 @@ inputParam['minDataCoverage'] = args.minCoverage / 100
 inputParam['blockSize'] = args.blockSize # in meters
 inputParam['monthMin'] = args.monthFrom
 inputParam['monthMax'] = args.monthTo
+inputParam['nCores'] args.nCores
 inputParam['resx'] = 10 # in meters
 inputParam['resy'] = -10 # in meters
 inputParam['projection'] = 'EPSG:3035'
@@ -101,7 +103,7 @@ recipe = {
     "automated": True
   },
   "input": {
-    "coverage_id": 'eu_class_user_' + str(args.runId),
+    "coverage_id": runName,
     "paths": [os.path.join(args.rasdamanRasterDir, runName, '*tif')]
   },
   "recipe": {"name": "map_mosaic", "options": {"wms_import": True}}
@@ -118,16 +120,47 @@ if os.path.exists(recipeLogFile):
 if os.path.exists(recipeResumeFile):
   os.unlink(recipeResumeFile)
 
+print('\n# Importing results to the rasdaman\n\n')
+
+print('\nDeleting existing coverage\n')
+resp = requests.get(args.rasdamanUrl, params = {'SERVICE': 'WCS', 'VERSION': '2.0.1', 'REQUEST': 'DeleteCoverage', 'COVERAGEID': runName})
+print(resp.url)
+print(resp.status_code)
+print(resp.text)
+
+print('\nImporting coverage\n')
+resp = requests.get('http://rasdaman/docker_run.php', params = {'model': 'wcst_import', 'runid': args.runId, 'modelkey': 'eu_class_user'})
+print(resp.url)
+print(resp.status_code)
+print(resp.text)
+
+print('\nImporting SLD style\n')
+sld = """<?xml version="1.0" encoding="ISO-8859-1"?>
+<StyledLayerDescriptor version="1.0.0" xsi:schemaLocation="http://www.opengis.net/sld StyledLayerDescriptor.xsd" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <NamedLayer>
+    <Name>Fixed color palette</Name>
+    <UserStyle>
+      <Title>Fixed color palette</Title>
+      <FeatureTypeStyle>
+        <Rule>
+          <RasterSymbolizer>
+            <ColorMap>
+              %s
+            </ColorMap>
+          </RasterSymbolizer>
+        </Rule>
+      </FeatureTypeStyle>
+    </UserStyle>
+  </NamedLayer>
+</StyledLayerDescriptor>"""
 with open(inputParam['legendFileJson'], 'r') as f:
   legend = json.load(f)
-colorTable = {'255': [255, 255, 255, 0]}
-for i in legend:
-  colorTable[str(len(colorTable))] = [int(i[1:3], 16), int(i[3:5], 16), int(i[5:7], 16), 255]
-with open(wmsStyleFile, 'w') as f:
-  json.dump({'ColorTableType': 'ColorMap', 'ColorTableDefinition': json.dumps({'type': 'values', 'colorTable': colorTable})}, f)
-
-print('\n# Importing results to the rasdaman\n\n')
-resp = requests.get('http://rasdaman/docker_run.php', params = {'model': 'wcst_import', 'runid': args.runId, 'modelkey': 'eu_class_user'})
+colorTable = ''
+for i in range(len(legend)):
+  colorTable += '<ColorMapEntry color="%s" quantity="%d" />' % (legend[i], i + 1)
+colorTable += '<ColorMapEntry color="#FFFFFF" quantity="255" opacity="0" />'
+sld = sld % colorTable
+resp = requests.post(args.rasdamanUrl, data = {'service': 'WMS', 'version': '1.3.0', 'request': 'InsertStyle', 'name': 'default', 'abstract': 'default style', 'layer': runName, 'ColorTableType': 'SLD', 'ColorTableDefinition': sld})
 print(resp.url)
 print(resp.status_code)
 print(resp.text)
@@ -143,7 +176,14 @@ result = {
       'fields': [{'name': 'fold', 'field': 'fold', 'type': 'string'}, {'name': 'accuracy', 'field': 'accuracy', 'type': 'number'}],
       'data': [{'fold': 1, 'accuracy': valRes['Min.']}, {'fold': 2, 'accuracy': valRes['Median']}, {'fold': 3, 'accuracy': valRes['Max.']}]
     }],
-    'raster': [{'name': 'Classification results', 'layer': recipe['input']['coverage_id']}]
+    'raster': [{
+      'name': 'Classification results', 
+      'layer': recipe['input']['coverage_id'],
+      'wms': 'rasdaman',
+      'style': 'default',
+      'pnglegend': runName + '.png',
+      'sld': sld
+    }]
   }
 }
 cur.execute("UPDATE system.runs SET status = 2, errorlog = '', result = %s WHERE id = %s", (json.dumps(result), args.runId))
