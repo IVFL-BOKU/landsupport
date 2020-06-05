@@ -52,7 +52,7 @@ inputParam['minDataCoverage'] = args.minCoverage / 100
 inputParam['blockSize'] = args.blockSize # in meters
 inputParam['monthMin'] = args.monthFrom
 inputParam['monthMax'] = args.monthTo
-inputParam['nCores'] args.nCores
+inputParam['nCores'] = args.nCores
 inputParam['resx'] = 10 # in meters
 inputParam['resy'] = -10 # in meters
 inputParam['projection'] = 'EPSG:3035'
