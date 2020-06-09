@@ -21,6 +21,10 @@ bandsYearly = c(
   'BSI2q05',   'BSI2q50',   'BSI2q98',
   'BLFEI2q05', 'BLFEI2q50', 'BLFEI2q98'
 )
+bandsMonthly = c('NDVI2', 'B02', 'B03', 'B04', 'B08')
+bandsYearly = c(
+  'NDVI2q05',  'NDVI2q50',  'NDVI2q98'
+)
 bands = dplyr::bind_rows(
   dplyr::tibble(band = bandsYearly, month = NA_integer_),
   expand.grid(band = bandsMonthly, month = param$monthMin:param$monthMax, stringsAsFactors = FALSE)
@@ -58,9 +62,10 @@ fetchFeaturesByPoint = function(trainData, bands) {
         )
       )
       if (resp$status_code == 200) {
-        return(as.numeric(httr::content(resp, 'text', encoding = 'UTF-8')))
+        value = as.integer(httr::content(resp, 'text', encoding = 'UTF-8'))
+        return(ifelse(value %in% c(-32768L, 32767L, 65535L), NA_integer_, value))
       } else {
-        return(NA_real_)
+        return(NA_integer_)
       }
     })
     dv
@@ -69,12 +74,15 @@ fetchFeaturesByPoint = function(trainData, bands) {
 }
 trainData = fetchFeaturesByPoint(trainData, bands)
 
-cat('Training the model\n')
-featuresCoverage = colSums(!is.na(trainData[, -1:-3])) / nrow(trainData)
-features = names(featuresCoverage)[featuresCoverage >= param$minDataCoverage]
+cat('Training the model\n\n')
+featuresCoverage = colSums(!is.na(trainData)) / nrow(trainData)
+features = setdiff(names(featuresCoverage)[featuresCoverage >= param$minDataCoverage], c('x', 'y', 'tilex', 'tiley', 'tile'))
+names(featuresCoverage[features])
 trainData$label = factor(trainData$label)
-task = mlr3::TaskClassif$new('task', target = 'label', backend = trainData[, -which(names(trainData) %in% c('x', 'y', 'tilex', 'tiley', 'tile'))])
+task = mlr3::TaskClassif$new('task', target = 'label', backend = trainData[, features])
 learner = mlr3::lrn('classif.ranger')
+learner$param_set$values = list(num.threads = param$nCores)
+learner$predict_type = 'prob'
 
 if (param$validationFile != '') {
   sampler = mlr3::rsmp("cv", folds = 3L)
@@ -120,17 +128,15 @@ roi = suppressWarnings(
 )
 bbox = sf::st_bbox(roi)
 px = bbox['xmin']
-py = bbox['ymin']
 while (px <= bbox['xmax']) {
+  py = bbox['ymin']
   while(py <= bbox['ymax']) {
     ppx = min(px + param$blockSize, bbox['xmax'])
     ppy = min(py + param$blockSize, bbox['ymax'])
-    cat('\tprocessing block', px, py, ppx, ppy, '\n')
+    cat('\tblock    ', px, '-', ppx, '    ', py, '-', ppy, '\n')
+    pxCount = NULL
    
-    dx = ceiling((ppx - px) / abs(param$resx))
-    dy = ceiling((ppy - py) / abs(param$resy))
     dataBlock = foreach (band = split(bands, seq_along(bands$band)), .combine = dplyr::bind_cols) %dopar% {
-      dataBlock = dplyr::tibble(.rows = dx * dy)
       cat('\t\tband', band$var, '\n')
       resp = httr::GET(
         sprintf(
@@ -146,8 +152,13 @@ while (px <= bbox['xmax']) {
         tmpFile = paste0(param$tmpDir, '/', param$runId, '_', band$var, '.tif')
         writeBin(httr::content(resp, 'raw'), tmpFile)
         tmpRast = suppressWarnings(raster::raster(tmpFile))
-        dataBlock[, band$var] = raster::getValues(tmpRast)
+        if (is.null(pxCount)) {
+          pxCount = nrow(tmpRast) * ncol(tmpRast)
+        }
+        dataBlock = dplyr::tibble(.rows = pxCount)
+        dataBlock[, band$var] = as.vector(raster::getValues(tmpRast))
       } else {
+        dataBlock = dplyr::tibble(.rows = pxCount)
         dataBlock[, band$var] = NA_integer_
       }
       dataBlock
@@ -160,14 +171,16 @@ while (px <= bbox['xmax']) {
     dataBlock[is.na(dataBlock)] = -100000L
     dataBlock$label = factor(1, levels = levels(trainData$label))
     task = mlr3::TaskClassif$new('task', target = 'label', backend = dataBlock)
-    prediction = learner$predict(task) %>%
-      mlr3::as.data.table() %>%
-      use_series('response')
-    tmpRast = raster::setValues(tmpRast, prediction)
-    targetFile = paste0(param$rasterDir, '/', px, '_', py, '.tif')
-    dir.create(dirname(targetFile), FALSE, TRUE)
-    suppressWarnings(unlink(targetFile))
+    prediction = learner$predict(task)
+    values = prediction$response
+    probs = apply(prediction$prob, 1, max)
+    values[probs < param$classProbMin] = NA_integer_
+    targetFileClass = paste0(param$rasterDir, '/class_', px, '_', py, '.tif')
+    targetFileProb = paste0(param$rasterDir, '/prob_', px, '_', py, '.tif')
+    dir.create(dirname(targetFileClass), FALSE, TRUE)
+    suppressWarnings(unlink(c(targetFileClass, targetFileProb)))
 
+    tmpRast = raster::setValues(tmpRast, values)
     suppressWarnings(raster::writeRaster(tmpRast, tmpFile, datatype = 'INT1U', overwrite = TRUE, NAflag = 255))
     # set projection in a way rasdaman can recognize and cut to the roi
     cat('\tpostprocessing\n')
@@ -175,14 +188,27 @@ while (px <= bbox['xmax']) {
     cmd = sprintf("gdal_translate -a_srs %s %s %s", shQuote(param$projection), shQuote(tmpFile), shQuote(tmpFile2))
     cat('\t\t', cmd, '\n')
     system(cmd)
-    cmd = sprintf("gdalwarp -cutline %s -cl roi -crop_to_cutline %s %s", shQuote(param$roiFile), shQuote(tmpFile2), shQuote(targetFile))
+    cmd = sprintf("gdalwarp -cutline %s -cl roi -crop_to_cutline %s %s", shQuote(param$roiFile), shQuote(tmpFile2), shQuote(targetFileClass))
     cat('\t\t', cmd, '\n')
     system(cmd)
     suppressWarnings(unlink(c(tmpFile, tmpFile2)))
 
-    px = px + param$blockSize
+    tmpRast = raster::setValues(tmpRast, as.integer(254 * probs))
+    suppressWarnings(raster::writeRaster(tmpRast, tmpFile, datatype = 'INT1U', overwrite = TRUE, NAflag = 255))
+    # set projection in a way rasdaman can recognize and cut to the roi
+    cat('\tpostprocessing\n')
+    tmpFile2 = paste0(dirname(tmpFile), '/_', basename(tmpFile))
+    cmd = sprintf("gdal_translate -a_srs %s %s %s", shQuote(param$projection), shQuote(tmpFile), shQuote(tmpFile2))
+    cat('\t\t', cmd, '\n')
+    system(cmd)
+    cmd = sprintf("gdalwarp -cutline %s -cl roi -crop_to_cutline %s %s", shQuote(param$roiFile), shQuote(tmpFile2), shQuote(targetFileProb))
+    cat('\t\t', cmd, '\n')
+    system(cmd)
+    suppressWarnings(unlink(c(tmpFile, tmpFile2)))
+
     py = py + param$blockSize
   }
+  px = px + param$blockSize
 }
 cat('\nEnded\n')
 

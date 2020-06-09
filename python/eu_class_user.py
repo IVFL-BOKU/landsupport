@@ -11,7 +11,7 @@ import subprocess
 parser = argparse.ArgumentParser()
 parser.add_argument('--dbConf')
 parser.add_argument('--rasdamanUrl', default='http://rasdaman:9009/rasdaman/ows')
-parser.add_argument('--coveragePrefix', default='CA')
+parser.add_argument('--coveragePrefix')
 parser.add_argument('--tmpDir', default='/cuber/tmp')
 parser.add_argument('--modelDir', default='/cuber')
 parser.add_argument('--rasdamanRasterDir', default='/geodata/runs')
@@ -22,8 +22,10 @@ parser.add_argument('--monthFrom', type=int, default=4)
 parser.add_argument('--monthTo', type=int, default=10)
 parser.add_argument('--fontSize', type=int, default=10)
 parser.add_argument('--minCoverage', type=int, default=98)
+parser.add_argument('--minClassProb', type=int, default=20)
 parser.add_argument('--blockSize', type=int, default=20000)
-parser.add_argument('--nCores', type=int, default=8)
+parser.add_argument('--nCores', type=int, default=4)
+parser.add_argument('--noCleanup', action='store_true')
 parser.add_argument('runId', type=int)
 args = parser.parse_args()
 
@@ -49,6 +51,7 @@ inputParam['roiFile'] = os.path.join(inputParam['tmpDir'], 'roi.geojson')
 inputParam['logFile'] = os.path.join(inputParam['tmpDir'], 'log')
 inputParam['validationFile'] = os.path.join(inputParam['tmpDir'], 'validation.json')  # leave empty for no validation
 inputParam['minDataCoverage'] = args.minCoverage / 100
+inputParam['minClassProb'] = args.minClassProb / 100
 inputParam['blockSize'] = args.blockSize # in meters
 inputParam['monthMin'] = args.monthFrom
 inputParam['monthMax'] = args.monthTo
@@ -97,45 +100,41 @@ print(result)
 
 # 3. Postprocessing
 recipe = {
-  "config": {
-    "service_url": 'http://127.0.0.1:9009/rasdaman/ows',
-    "mock": False,
-    "automated": True
-  },
-  "input": {
-    "coverage_id": runName,
-    "paths": [os.path.join(args.rasdamanRasterDir, runName, '*tif')]
-  },
+  "config": {"service_url": 'http://127.0.0.1:9009/rasdaman/ows', "mock": False, "automated": True},
+  "input": {"coverage_id": '', "paths": ['']},
   "recipe": {"name": "map_mosaic", "options": {"wms_import": True}}
 }
-recipeFile = os.path.join(args.recipeDir, runName + '.json')
-recipeLogFile = recipeFile + '.log'
-recipeResumeFile = re.sub('json$', 'resume.json', recipeFile)
-wmsStyleFile = os.path.join(args.recipeDir, runName + '_style.json')
-os.makedirs(os.path.dirname(recipeFile), exist_ok=True)
-with open(recipeFile, 'w') as f:
-  json.dump(recipe, f)
-if os.path.exists(recipeLogFile):
-  os.unlink(recipeLogFile)
-if os.path.exists(recipeResumeFile):
-  os.unlink(recipeResumeFile)
-
 print('\n# Importing results to the rasdaman\n\n')
+for i in ['class', 'prob']:
+  runName2 = runName + '_' + i
+  recipe['input'] = {'coverage_id': runName + '_' + i, 'paths': [os.path.join(args.rasdamanRasterDir, runName, i + '*tif')]}
+  recipeFile = os.path.join(args.recipeDir, runName2 + '.json')
+  recipeLogFile = recipeFile + '.log'
+  recipeResumeFile = re.sub('json$', 'resume.json', recipeFile)
+  wmsStyleFile = os.path.join(args.recipeDir, runName + '_style.json')
+  os.makedirs(os.path.dirname(recipeFile), exist_ok=True)
+  with open(recipeFile, 'w') as f:
+    json.dump(recipe, f)
+  if os.path.exists(recipeLogFile):
+    os.unlink(recipeLogFile)
+  if os.path.exists(recipeResumeFile):
+    os.unlink(recipeResumeFile)
 
-print('\nDeleting existing coverage\n')
-resp = requests.get(args.rasdamanUrl, params = {'SERVICE': 'WCS', 'VERSION': '2.0.1', 'REQUEST': 'DeleteCoverage', 'COVERAGEID': runName})
-print(resp.url)
-print(resp.status_code)
-print(resp.text)
+  print('\nDeleting existing coverage\n')
+  resp = requests.get(args.rasdamanUrl, params = {'SERVICE': 'WCS', 'VERSION': '2.0.1', 'REQUEST': 'DeleteCoverage', 'COVERAGEID': runName2})
+  print(resp.url)
+  print(resp.status_code)
+  print(resp.text)
 
-print('\nImporting coverage\n')
-resp = requests.get('http://rasdaman/docker_run.php', params = {'model': 'wcst_import', 'runid': args.runId, 'modelkey': 'eu_class_user'})
-print(resp.url)
-print(resp.status_code)
-print(resp.text)
+  print('\nImporting coverage\n')
+  resp = requests.get('http://rasdaman/docker_run.php', params = {'model': 'wcst_import', 'runid': str(args.runId) + '_' + i, 'modelkey': 'eu_class_user'})
+  print(resp.url)
+  print(resp.status_code)
+  print(resp.text)
 
-print('\nImporting SLD style\n')
-sld = """<?xml version="1.0" encoding="ISO-8859-1"?>
+  if i == 'class':
+    print('\nImporting SLD style\n')
+    sld = """<?xml version="1.0" encoding="ISO-8859-1"?>
 <StyledLayerDescriptor version="1.0.0" xsi:schemaLocation="http://www.opengis.net/sld StyledLayerDescriptor.xsd" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <NamedLayer>
     <Name>Fixed color palette</Name>
@@ -153,17 +152,17 @@ sld = """<?xml version="1.0" encoding="ISO-8859-1"?>
     </UserStyle>
   </NamedLayer>
 </StyledLayerDescriptor>"""
-with open(inputParam['legendFileJson'], 'r') as f:
-  legend = json.load(f)
-colorTable = ''
-for i in range(len(legend)):
-  colorTable += '<ColorMapEntry color="%s" quantity="%d" />' % (legend[i], i + 1)
-colorTable += '<ColorMapEntry color="#FFFFFF" quantity="255" opacity="0" />'
-sld = sld % colorTable
-resp = requests.post(args.rasdamanUrl, data = {'service': 'WMS', 'version': '1.3.0', 'request': 'InsertStyle', 'name': 'default', 'abstract': 'default style', 'layer': runName, 'ColorTableType': 'SLD', 'ColorTableDefinition': sld})
-print(resp.url)
-print(resp.status_code)
-print(resp.text)
+    with open(inputParam['legendFileJson'], 'r') as f:
+      legend = json.load(f)
+    colorTable = ''
+    for i in range(len(legend)):
+      colorTable += '<ColorMapEntry color="%s" quantity="%d" />' % (legend[i], i + 1)
+    colorTable += '<ColorMapEntry color="#FFFFFF" quantity="255" opacity="0" />'
+    sld = sld % colorTable
+    resp = requests.post(args.rasdamanUrl, data = {'service': 'WMS', 'version': '1.3.0', 'request': 'InsertStyle', 'name': 'default', 'abstract': 'default style', 'layer': runName + '_class', 'ColorTableType': 'SLD', 'ColorTableDefinition': sld})
+    print(resp.url)
+    print(resp.status_code)
+    print(resp.text)
 
 print('\n# Updating the GUI database\n\n')
 with open(inputParam['validationFile'], 'r') as f:
@@ -176,19 +175,27 @@ result = {
       'fields': [{'name': 'fold', 'field': 'fold', 'type': 'string'}, {'name': 'accuracy', 'field': 'accuracy', 'type': 'number'}],
       'data': [{'fold': 1, 'accuracy': valRes['Min.']}, {'fold': 2, 'accuracy': valRes['Median']}, {'fold': 3, 'accuracy': valRes['Max.']}]
     }],
-    'raster': [{
-      'name': 'Classification results', 
-      'layer': recipe['input']['coverage_id'],
-      'wms': 'rasdaman',
-      'style': 'default',
-      'pnglegend': runName + '.png',
-      'sld': sld
-    }]
+    'raster': [
+      {
+        'name': 'Classification results', 
+        'layer': runName + '_class',
+        'wms': 'rasdaman',
+        'style': 'default',
+        'pnglegend': runName + '.png',
+        'sld': sld
+      },
+      {
+        'name': 'Classification probability', 
+        'layer': runName + '_prob',
+        'wms': 'rasdaman'
+      }
+    ]
   }
 }
 cur.execute("UPDATE system.runs SET status = 2, errorlog = '', result = %s WHERE id = %s", (json.dumps(result), args.runId))
 conn.commit()
 
-print('\n# Cleaning up\n\n')
-shutil.rmtree(inputParam['tmpDir'], True)
-shutil.rmtree(inputParam['rasterDir'], True)
+if not args.noCleanup:
+  print('\n# Cleaning up\n\n')
+  shutil.rmtree(inputParam['tmpDir'], True)
+  shutil.rmtree(inputParam['rasterDir'], True)
