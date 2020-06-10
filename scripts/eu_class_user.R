@@ -21,10 +21,8 @@ bandsYearly = c(
   'BSI2q05',   'BSI2q50',   'BSI2q98',
   'BLFEI2q05', 'BLFEI2q50', 'BLFEI2q98'
 )
-bandsMonthly = c('NDVI2', 'B02', 'B03', 'B04', 'B08')
-bandsYearly = c(
-  'NDVI2q05',  'NDVI2q50',  'NDVI2q98'
-)
+#bandsMonthly = c('NDVI2', 'B02', 'B03', 'B04', 'B08')
+#bandsYearly = c('NDVI2q05',  'NDVI2q50',  'NDVI2q98')
 bands = dplyr::bind_rows(
   dplyr::tibble(band = bandsYearly, month = NA_integer_),
   expand.grid(band = bandsMonthly, month = param$monthMin:param$monthMax, stringsAsFactors = FALSE)
@@ -77,9 +75,17 @@ trainData = fetchFeaturesByPoint(trainData, bands)
 cat('Training the model\n\n')
 featuresCoverage = colSums(!is.na(trainData)) / nrow(trainData)
 features = setdiff(names(featuresCoverage)[featuresCoverage >= param$minDataCoverage], c('x', 'y', 'tilex', 'tiley', 'tile'))
-names(featuresCoverage[features])
 trainData$label = factor(trainData$label)
 task = mlr3::TaskClassif$new('task', target = 'label', backend = trainData[, features])
+if (length(features) > param$maxFeatures) {
+  filter = mlr3filters::flt('information_gain')
+  importance = filter$calculate(task) %>% mlr3::as.data.table() %>% dplyr::as_tibble()
+  cat('\tReducing features count to', param$maxFeatures, 'based on information gain\n')
+  features = c('label', importance$feature[1:param$maxFeatures])
+  task = mlr3::TaskClassif$new('task', target = 'label', backend = trainData[, features])
+  rm(filter, importance)
+}
+features
 learner = mlr3::lrn('classif.ranger')
 learner$param_set$values = list(num.threads = param$nCores)
 learner$predict_type = 'prob'
@@ -94,9 +100,6 @@ if (param$validationFile != '') {
 }
 
 learner$train(task)
-
-bands = bands %>%
-  dplyr::filter(var %in% features)
 
 drawLegend = function(labels, fontSize, pngPath, jsonPath) {
   nl = length(labels)
@@ -118,6 +121,11 @@ drawLegend = function(labels, fontSize, pngPath, jsonPath) {
   dev.off()
 }
 drawLegend(levels(trainData$label), param$fontSize, param$legendFilePng, param$legendFileJson)
+
+bands = bands %>%
+  dplyr::filter(var %in% features)
+labels = levels(trainData$label)
+rm(trainData, task)
 
 cat('\nProcessing region of interest\n')
 tmpFile = paste0(param$tmpDir, '/', param$runId, '.tif')
@@ -169,7 +177,7 @@ while (px <= bbox['xmax']) {
 
     cat('\tclassifying\n')
     dataBlock[is.na(dataBlock)] = -100000L
-    dataBlock$label = factor(1, levels = levels(trainData$label))
+    dataBlock$label = factor(1, levels = labels)
     task = mlr3::TaskClassif$new('task', target = 'label', backend = dataBlock)
     prediction = learner$predict(task)
     values = prediction$response
@@ -206,6 +214,7 @@ while (px <= bbox['xmax']) {
     system(cmd)
     suppressWarnings(unlink(c(tmpFile, tmpFile2)))
 
+    rm(dataBlock, tmpRast, prediction, values, probs)
     py = py + param$blockSize
   }
   px = px + param$blockSize
