@@ -7,6 +7,7 @@ import re
 import requests
 import shutil
 import subprocess
+import traceback
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dbConf')
@@ -113,6 +114,7 @@ try:
     "recipe": {"name": "map_mosaic", "options": {"wms_import": True}}
   }
   print('\n# Importing results to the rasdaman\n\n')
+  slds = {}
   for i in ['class', 'prob']:
     runName2 = runName + '_' + i
     recipe['input'] = {'coverage_id': runName + '_' + i, 'paths': [os.path.join(args.rasdamanRasterDir, runName, i + '*tif')]}
@@ -142,9 +144,8 @@ try:
     if int(resp.status_code / 100) != 2:
       raise Exception('Importing results into rasdaman failed')
 
-    if i == 'class':
-      print('\nImporting SLD style\n')
-      sld = """<?xml version="1.0" encoding="ISO-8859-1"?>
+    print('\nImporting SLD style\n')
+    sld = """<?xml version="1.0" encoding="ISO-8859-1"?>
 <StyledLayerDescriptor version="1.0.0" xsi:schemaLocation="http://www.opengis.net/sld StyledLayerDescriptor.xsd" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <NamedLayer>
     <Name>Fixed color palette</Name>
@@ -162,19 +163,23 @@ try:
     </UserStyle>
   </NamedLayer>
 </StyledLayerDescriptor>"""
+    colorTable = '<ColorMapEntry color="#FFFFFF" quantity="0" opacity="0" />'
+    if i == 'class':
       with open(inputParam['legendFileJson'], 'r') as f:
         legend = json.load(f)
-      colorTable = ''
-      for i in range(len(legend)):
-        colorTable += '<ColorMapEntry color="%s" quantity="%d" />' % (legend[i], i + 1)
-      colorTable += '<ColorMapEntry color="#FFFFFF" quantity="255" opacity="0" />'
-      sld = sld % colorTable
-      resp = requests.post(args.rasdamanUrl, data = {'service': 'WMS', 'version': '1.3.0', 'request': 'InsertStyle', 'name': 'default', 'abstract': 'default style', 'layer': runName + '_class', 'ColorTableType': 'SLD', 'ColorTableDefinition': sld})
-      print(resp.url)
-      print(resp.status_code)
-      print(resp.text)
-      if int(resp.status_code / 100) != 2:
-        raise Exception('Importing raster style failed')
+        for j in range(len(legend)):
+          colorTable += '<ColorMapEntry color="%s" quantity="%d" />' % (legend[j], j + 1)
+    else:
+      for j in range(1, 255):
+        colorTable += '<ColorMapEntry color="#%02X%02X%02X" quantity="%d" />' % (j, j, j, j)
+    colorTable += '<ColorMapEntry color="#FFFFFF" quantity="255" opacity="0" />'
+    slds[i] = sld % colorTable
+    resp = requests.post(args.rasdamanUrl, data = {'service': 'WMS', 'version': '1.3.0', 'request': 'InsertStyle', 'name': 'default', 'abstract': 'default style', 'layer': runName + '_' + i, 'ColorTableType': 'SLD', 'ColorTableDefinition': slds[i]})
+    print(resp.url)
+    print(resp.status_code)
+    print(resp.text)
+    if int(resp.status_code / 100) != 2:
+      raise Exception('Importing raster style failed')
 
   print('\n# Updating the GUI database\n\n')
   with open(inputParam['validationFile'], 'r') as f:
@@ -189,17 +194,19 @@ try:
       }],
       'raster': [
         {
-          'name': 'Classification results', 
+          'name': runName + ' classification results', 
           'layer': runName + '_class',
           'wms': 'rasdaman',
           'style': 'default',
-          'pnglegend': runName + '.png',
-          'sld': sld
+          'pnglegend': runName + '_class.png',
+          'sld': slds['class']
         },
         {
-          'name': 'Classification probability', 
+          'name': runName + ' classification probability', 
           'layer': runName + '_prob',
-          'wms': 'rasdaman'
+          'wms': 'rasdaman',
+          'style': 'default',
+          'sld': slds['prob']
         }
       ]
     }
@@ -215,6 +222,7 @@ try:
     shutil.rmtree(inputParam['tmpDir'], True)
     shutil.rmtree(inputParam['rasterDir'], True)
 except Exception as e:
+  traceback.print_exc()
   cur.execute(
     "UPDATE system.runs SET status = 3, endtime = clock_timestamp(), errorlog = %s, result = '' WHERE id = %s",
     (json.dumps({'error': str(e)}), args.runId)
