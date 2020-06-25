@@ -12,6 +12,7 @@ import traceback
 parser = argparse.ArgumentParser()
 parser.add_argument('--dbConf')
 parser.add_argument('--rasdamanUrl', default='http://rasdaman:9009/rasdaman/ows')
+parser.add_argument('--extRasdamanUrl', default='http://rasdaman:9009/rasdaman/ows')
 parser.add_argument('--coveragePrefix')
 parser.add_argument('--tmpDir', default='/cuber/tmp')
 parser.add_argument('--modelDir', default='/cuber/cubeR/scripts')
@@ -197,6 +198,7 @@ try:
           'name': runName + ' classification results', 
           'layer': runName + '_class',
           'wms': 'rasdaman',
+          'wmsUrl': args.extRasdamanUrl,
           'style': 'default',
           'pnglegend': runName + '_class.png',
           'sld': slds['class']
@@ -205,6 +207,7 @@ try:
           'name': runName + ' classification probability', 
           'layer': runName + '_prob',
           'wms': 'rasdaman',
+          'wmsUrl': args.extRasdamanUrl,
           'style': 'default',
           'sld': slds['prob']
         }
