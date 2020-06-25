@@ -88,7 +88,7 @@ prepareIndicators = function(input, targetDir, tmpDir, indicators, skipExisting 
         preCommand = paste0(.data$data[[1]]$command[!file.exists(.data$data[[1]]$tileFile)], collapse = '; ')
         system(preCommand, ignore.stdout = TRUE)
         system(.data$command, ignore.stdout = TRUE)
-        dplyr::as.tbl(data.frame(band = .data$outBand, tileFile = .data$outFile, processed = TRUE, stringsAsFactors = FALSE))
+        dplyr::as_tibble(data.frame(band = .data$outBand, tileFile = .data$outFile, processed = TRUE, stringsAsFactors = FALSE))
       }) %>%
       dplyr::ungroup()
   }

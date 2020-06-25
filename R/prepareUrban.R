@@ -76,7 +76,7 @@ prepareUrban = function(input, targetDir, tmpDir, bandName, blockSize, gdalOpts,
           gdalOpts, paste0(shQuote(tmpFiles), collapse = ' '), shQuote(.data$tmpFile), shQuote(.data$tmpFile), shQuote(.data$tileFile)
         )
         system(command, ignore.stdout = TRUE)
-        dplyr::as.tbl(data.frame(tileFile = .data$tileFile, processed = TRUE, stringsAsFactors = FALSE))
+        dplyr::as_tibble(data.frame(tileFile = .data$tileFile, processed = TRUE, stringsAsFactors = FALSE))
       }) %>%
       dplyr::ungroup()
   }

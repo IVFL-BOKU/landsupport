@@ -71,7 +71,7 @@ prepareTiles = function(input, targetDir, gridFile, tmpDir, method, skipExisting
       dplyr::group_by(.data$period, .data$tile, .data$band) %>%
       dplyr::do({
         system(.data$command, ignore.stdout = TRUE)
-        dplyr::as.tbl(data.frame(tileFile = .data$outFile, processed = TRUE, stringsAsFactors = FALSE))
+        dplyr::as_tibble(data.frame(tileFile = .data$outFile, processed = TRUE, stringsAsFactors = FALSE))
       }) %>%
       dplyr::ungroup()
   }

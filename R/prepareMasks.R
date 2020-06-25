@@ -110,7 +110,7 @@ prepareMasks = function(input, targetDir, tmpDir, bandName, minArea, bufferSize,
         system(command, ignore.stdout = TRUE)
         unlink(tmpFile)
 
-        dplyr::as.tbl(data.frame(band = bandName, tileFile = .data$tileFile, processed = TRUE, stringsAsFactors = FALSE))
+        dplyr::as_tibble(data.frame(band = bandName, tileFile = .data$tileFile, processed = TRUE, stringsAsFactors = FALSE))
       }) %>%
       dplyr::ungroup()
   }

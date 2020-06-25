@@ -79,7 +79,7 @@ prepareWhich = function(input, targetDir, tmpDir, pythonDir, outBandPrefix, skip
       dplyr::group_by(.data$period, .data$tile, .data$band) %>%
       do({
         system(.data$command, ignore.stdout = TRUE)
-        dplyr::as.tbl(data.frame(band = .data$whichBand, tileFile = .data$outFile, processed = TRUE, stringsAsFactors = FALSE))
+        dplyr::as_tibble(data.frame(band = .data$whichBand, tileFile = .data$outFile, processed = TRUE, stringsAsFactors = FALSE))
       }) %>%
       dplyr::ungroup()
   }

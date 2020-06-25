@@ -7,6 +7,6 @@
 getCache = function(region, dateFrom, dateTo, cfgFile) {
   source(cfgFile, local = TRUE)
   cachePath = getCachePath(get('cacheTmpl'), region, dateFrom, dateTo, get('cloudCov'), get('bands'))
-  images = dplyr::as.tbl(utils::read.csv(cachePath, stringsAsFactors = FALSE))
+  images = dplyr::as_tibble(utils::read.csv(cachePath, stringsAsFactors = FALSE))
   return(images)
 }

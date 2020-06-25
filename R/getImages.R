@@ -13,7 +13,7 @@
 #' @import dplyr
 #' @export
 getImages = function(roiId, dateMin, dateMax, cloudCovMax, dir, bandsS2, ...) {
-  imgs = dplyr::as.tbl(sentinel2::S2_query_image(regionId = roiId, dateMin = dateMin, dateMax = dateMax, cloudCovMin = 0, cloudCovMax = cloudCovMax * 100, atmCorr = TRUE, owned = TRUE, ...))
+  imgs = dplyr::as_tibble(sentinel2::S2_query_image(regionId = roiId, dateMin = dateMin, dateMax = dateMax, cloudCovMin = 0, cloudCovMax = cloudCovMax * 100, atmCorr = TRUE, owned = TRUE, ...))
   imgs = imgs %>%
     dplyr::rename(dateFull = .data$date) %>%
     dplyr::mutate(date = substr(.data$dateFull, 1, 10)) %>%
