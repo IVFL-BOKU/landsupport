@@ -209,6 +209,7 @@ try:
           'wms': 'rasdaman',
           'wmsUrl': args.extRasdamanUrl,
           'style': 'default',
+          'pnglegend': 'eu_class_user_classprob.png',
           'sld': slds['prob']
         }
       ]
