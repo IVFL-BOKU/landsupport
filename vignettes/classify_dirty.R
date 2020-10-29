@@ -2,20 +2,16 @@
 # - it is assumed that the modelFile contains three models sorted from most to less precise one
 # - for performance reasons (1000 times speedup) it's better to read whole rasters at once but it makes the script very memory hungry
 #   so choose the number of threads carefully
-modelFile = 'vignettes/lucas_features_selection_models.RData'
+modelFile = '/eodc/private/boku/ACube2/models/LC/2018y1_MODEL_LC.RData'
 tilesDir = '/eodc/private/boku/ACube2/tiles'
 tmpDir = '/eodc/private/boku/ACube2/tmp'
 year = 2018
 outBand = 'CLASS'
 blockSize = 1000000
-learnerNumThreads = 40
-nCores = 1
+learnerNumThreads = 15
+nCores = 3
 cubeRpath = '/eodc/private/boku/software/cubeR'
 skipExisting = TRUE
-
-args = commandArgs(TRUE)
-t0 = Sys.time()
-cat(paste0(c('Running classify.R', args, as.character(Sys.time()), '\n'), collapse = '\t'))
 
 devtools::load_all(cubeRpath, quiet = TRUE)
 library(dplyr, quietly = TRUE)
@@ -45,9 +41,8 @@ registerDoParallel()
 options(cores = nCores)
 tiles = list.dirs(tilesDir, full.names = FALSE, recursive = FALSE)
 tiles = tiles[nchar(tiles) == 6]
-tiles = c(c('E48N27', 'E48N28', 'E49N27', 'E49N28', 'E46N19', 'E46N20', 'E47N19', 'E47N20'), tiles) # Marchfeld and Naples first
-#output = foreach(tls = tiles, .combine = bind_rows) %dopar% {
-output = foreach(tls = tiles, .combine = bind_rows) %do% {
+output = foreach(tls = tiles, .combine = bind_rows) %dopar% {
+#output = foreach(tls = tiles, .combine = bind_rows) %do% {
   cat(tls, '\n', sep = '')
 
   outFiles = getTilePath(tilesDir, tls, paste0(year, 'y1'), paste0(outBand, c('', 'PROB')), 'tif')
