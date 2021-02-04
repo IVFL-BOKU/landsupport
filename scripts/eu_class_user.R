@@ -49,20 +49,20 @@ fetchFeaturesByPoint = function(trainData, bands) {
     cat('\t', band$var, '\n')
     dv = dplyr::tibble(.rows = nrow(trainData))
     dv[, band$var] = purrr::map2_dbl(trainData$x, trainData$y, function(x, y) {
-      resp = httr::GET(
-        sprintf(
-          '%s?SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage&COVERAGEID=%s&SUBSET=X(%d)&SUBSET=Y(%d)&SUBSET=%s&FORMAT=%s',
-          param$rasdamanUrl, 
-          URLencode(paste0(param$coveragePrefix, '_', band$band)), 
-          as.integer(x), as.integer(y), 
-          URLencode(paste0('ansi("', band$date, 'T00:00:00.000Z")')), 
-          URLencode('application/json')
-        )
+      url = sprintf(
+        '%s?SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage&COVERAGEID=%s&SUBSET=X(%d)&SUBSET=Y(%d)&SUBSET=%s&FORMAT=%s',
+        param$rasdamanUrl,
+        URLencode(paste0(param$coveragePrefix, '_', band$band)),
+        as.integer(x), as.integer(y),
+        URLencode(paste0('ansi("', band$date, 'T00:00:00.000Z")')),
+        URLencode('application/json')
       )
+      resp = httr::GET(url)
       if (resp$status_code == 200) {
         value = as.integer(httr::content(resp, 'text', encoding = 'UTF-8'))
         return(ifelse(value %in% c(-32768L, 32767L, 65535L), NA_integer_, value))
       } else {
+        #cat(url, '\n', resp$status_code, ':', httr::content(resp, 'text', encoding = 'UTF-8'))
         return(NA_integer_)
       }
     })
