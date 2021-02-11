@@ -57,13 +57,18 @@ fetchFeaturesByPoint = function(trainData, bands) {
         URLencode(paste0('ansi("', band$date, 'T00:00:00.000Z")')),
         URLencode('application/json')
       )
-      resp = httr::GET(url)
-      if (resp$status_code == 200) {
-        value = as.integer(httr::content(resp, 'text', encoding = 'UTF-8'))
-        return(ifelse(value %in% c(-32768L, 32767L, 65535L), NA_integer_, value))
-      } else {
-        #cat(url, '\n', resp$status_code, ':', httr::content(resp, 'text', encoding = 'UTF-8'))
+      resp = try(httr::GET(url), silent = TRUE)
+      if (class(resp) == 'try-error') {
+        cat("Error fetching data from", url, '\n')
         return(NA_integer_)
+      } else {
+        if (resp$status_code == 200) {
+          value = as.integer(httr::content(resp, 'text', encoding = 'UTF-8'))
+          return(ifelse(value %in% c(-32768L, 32767L, 65535L), NA_integer_, value))
+        } else {
+          #cat(url, '\n', resp$status_code, ':', httr::content(resp, 'text', encoding = 'UTF-8'))
+          return(NA_integer_)
+        }
       }
     })
     dv
@@ -75,6 +80,9 @@ trainData = fetchFeaturesByPoint(trainData, bands)
 cat('Training the model\n\n')
 featuresCoverage = colSums(!is.na(trainData)) / nrow(trainData)
 features = setdiff(names(featuresCoverage)[featuresCoverage >= param$minDataCoverage], c('x', 'y', 'tilex', 'tiley', 'tile'))
+if (length(features) <= 1) { # 1 cause label is always there
+  stop("No features extracted from the rasdaman. Either the training data is outside of the spatial and/or temporal domain of data available in the resdaman or rasdman doesn't work properly")
+}
 trainData$label = factor(trainData$label)
 task = mlr3::TaskClassif$new('task', target = 'label', backend = trainData[, features])
 if (length(features) > param$maxFeatures) {

@@ -1,12 +1,14 @@
 import argparse
 import itertools
 import json
+import logging
 import os
 import psycopg2
 import re
 import requests
 import shutil
 import subprocess
+import sys
 import traceback
 
 parser = argparse.ArgumentParser()
@@ -29,8 +31,18 @@ parser.add_argument('--minClassProb', type=int, default=20)
 parser.add_argument('--blockSize', type=int, default=20000)
 parser.add_argument('--nCores', type=int, default=4)
 parser.add_argument('--noCleanup', action='store_true')
+parser.add_argument('--logDir', default='/logs/')
 parser.add_argument('runId', type=int)
 args = parser.parse_args()
+
+if os.path.exists(args.logDir):
+  logFile = os.path.join(args.logDir, str(args.runId) + '.log')
+  if os.path.exists(logFile):
+    os.unlink(logFile)
+  logging.basicConfig(filename=logFile, level=logging.INFO)
+  logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+else:
+  logging.warning("logDir doesn't exist, logging only to the standard output")
 
 conn = psycopg2.connect(args.dbConf)
 cur = conn.cursor()
@@ -102,9 +114,12 @@ try:
   conn.commit() # to end "idle in transaction state"
 
   # 2. Calling classification algorithm implemented in R
-  print('\n#Running the model\n\n')
-  result = subprocess.run(['/usr/bin/Rscript', args.modelDir + '/eu_class_user.R', paramFile])
-  print(result)
+  logging.info('# Running the model')
+  result = subprocess.run(['/usr/bin/Rscript', args.modelDir + '/eu_class_user.R', paramFile], capture_output=True)
+  logging.info(result.args)
+  logging.info(result.stdout.decode('utf-8'))
+  if (len(result.stderr) > 0):
+    logging.error(result.stderr.decode('utf-8'))
   if result.returncode != 0:
     raise Exception('eu_class_user.R has non-zero exit status')
 
@@ -114,7 +129,7 @@ try:
     "input": {"coverage_id": '', "paths": ['']},
     "recipe": {"name": "map_mosaic", "options": {"wms_import": True}}
   }
-  print('\n# Importing results to the rasdaman\n\n')
+  logging.info('# Importing results to the rasdaman')
   slds = {}
   for i in ['class', 'prob']:
     runName2 = runName + '_' + i
@@ -131,21 +146,17 @@ try:
     if os.path.exists(recipeResumeFile):
       os.unlink(recipeResumeFile)
 
-    print('\nDeleting existing coverage\n')
+    logging.info('Deleting existing coverage')
     resp = requests.get(args.rasdamanUrl, params = {'SERVICE': 'WCS', 'VERSION': '2.0.1', 'REQUEST': 'DeleteCoverage', 'COVERAGEID': runName2})
-    print(resp.url)
-    print(resp.status_code)
-    print(resp.text)
+    logging.info(str(resp.url) + '\n' + str(resp.status_code) + '\n' + resp.text)
 
-    print('\nImporting coverage\n')
+    logging.info('Importing coverage')
     resp = requests.get('http://rasdaman/docker_run.php', params = {'model': 'wcst_import', 'runid': str(args.runId) + '_' + i, 'modelkey': 'eu_class_user'})
-    print(resp.url)
-    print(resp.status_code)
-    print(resp.text)
+    logging.info(str(resp.url) + '\n' + str(resp.status_code) + '\n' + resp.text)
     if int(resp.status_code / 100) != 2:
       raise Exception('Importing results into rasdaman failed')
 
-    print('\nImporting SLD style\n')
+    logging.info('Importing SLD style')
     sld = """<?xml version="1.0" encoding="ISO-8859-1"?>
 <StyledLayerDescriptor version="1.0.0" xsi:schemaLocation="http://www.opengis.net/sld StyledLayerDescriptor.xsd" xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <NamedLayer>
@@ -176,13 +187,11 @@ try:
     colorTable += '<ColorMapEntry color="#FFFFFF" quantity="255" opacity="0" />'
     slds[i] = sld % colorTable
     resp = requests.post(args.rasdamanUrl, data = {'service': 'WMS', 'version': '1.3.0', 'request': 'InsertStyle', 'name': 'default', 'abstract': 'default style', 'layer': runName + '_' + i, 'ColorTableType': 'SLD', 'ColorTableDefinition': slds[i]})
-    print(resp.url)
-    print(resp.status_code)
-    print(resp.text)
+    logging.info(str(resp.url) + '\n' + str(resp.status_code) + '\n' + resp.text)
     if int(resp.status_code / 100) != 2:
       raise Exception('Importing raster style failed')
 
-  print('\n# Updating the GUI database\n\n')
+  logging.info('# Updating the GUI database')
   with open(inputParam['validationFile'], 'r') as f:
     valRes = json.load(f)
 
@@ -222,11 +231,11 @@ try:
   conn.commit()
 
   if not args.noCleanup:
-    print('\n# Cleaning up\n\n')
+    logging.info('# Cleaning up')
     shutil.rmtree(inputParam['tmpDir'], True)
     shutil.rmtree(inputParam['rasterDir'], True)
 except Exception as e:
-  traceback.print_exc()
+  logging.error(traceback.format_exc())
   cur.execute(
     "UPDATE system.runs SET status = 3, endtime = clock_timestamp(), errorlog = %s, result = '' WHERE id = %s",
     (json.dumps({'error': str(e)}), args.runId)
