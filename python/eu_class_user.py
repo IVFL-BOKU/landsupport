@@ -1,4 +1,5 @@
 import argparse
+import datetime
 import itertools
 import json
 import logging
@@ -37,12 +38,11 @@ args = parser.parse_args()
 
 if os.path.exists(args.logDir):
   logFile = os.path.join(args.logDir, str(args.runId) + '.log')
-  if os.path.exists(logFile):
-    os.unlink(logFile)
   logging.basicConfig(filename=logFile, level=logging.INFO)
   logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 else:
   logging.warning("logDir doesn't exist, logging only to the standard output")
+logging.info("\n####################\n# eu_class_user workflow started on " + str(datetime.datetime.now()) + "\n####################\n")
 
 conn = psycopg2.connect(args.dbConf)
 cur = conn.cursor()
