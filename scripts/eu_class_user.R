@@ -32,7 +32,7 @@ bands = dplyr::bind_rows(
     var = paste0(band, dplyr::if_else(is.na(month), '_y', sprintf('_m%02d', month)))
   ) %>%
   dplyr::mutate(
-    date = dplyr::if_else(is.na(month), paste0(param$year, '-01-01'), sprintf('%04d-%02d', as.integer(param$year), month))
+    date = dplyr::if_else(is.na(month), paste0(param$year, '-01-01'), sprintf('%04d-%02d-01', as.integer(param$year), month))
   )
 
 cat('Extracting feature values for training data\n')
@@ -47,6 +47,7 @@ trainData = dplyr::bind_rows(lapply(param$referencePoints, dplyr::as_tibble)) %>
 fetchFeaturesByPoint = function(trainData, bands) {
   trainDataValues = foreach (band = split(bands, seq_along(bands$band)), .combine = dplyr::bind_cols) %dopar% {
     cat('\t', band$var, '\n')
+    failsReported = 0
     dv = dplyr::tibble(.rows = nrow(trainData))
     dv[, band$var] = purrr::map2_dbl(trainData$x, trainData$y, function(x, y) {
       url = sprintf(
@@ -66,7 +67,10 @@ fetchFeaturesByPoint = function(trainData, bands) {
           value = as.integer(httr::content(resp, 'text', encoding = 'UTF-8'))
           return(ifelse(value %in% c(-32768L, 32767L, 65535L), NA_integer_, value))
         } else {
-          #cat(url, '\n', resp$status_code, ':', httr::content(resp, 'text', encoding = 'UTF-8'))
+          if (failsReported < 2) {
+            cat(url, '\n', resp$status_code, ':', httr::content(resp, 'text', encoding = 'UTF-8'))
+            failsReported <<- failsReported + 1
+          }
           return(NA_integer_)
         }
       }
