@@ -55,7 +55,7 @@ fetchFeaturesByPoint = function(trainData, bands) {
         param$rasdamanUrl,
         URLencode(paste0(param$coveragePrefix, '_', band$band)),
         as.integer(x), as.integer(y),
-        URLencode(paste0('ansi("', band$date, 'T00:00:00.000Z")')),
+        URLencode(paste0('ansi("', band$date, 'T00:00:00.000Z","', band$date, 'T00:00:00.000Z")')),
         URLencode('application/json')
       )
       resp = try(httr::GET(url), silent = TRUE)
@@ -64,7 +64,7 @@ fetchFeaturesByPoint = function(trainData, bands) {
         return(NA_integer_)
       } else {
         if (resp$status_code == 200) {
-          value = as.integer(httr::content(resp, 'text', encoding = 'UTF-8'))
+          value = as.integer(jsonlite::fromJSON(httr::content(resp, 'text', encoding = 'UTF-8')))
           return(ifelse(value %in% c(-32768L, 32767L, 65535L), NA_integer_, value))
         } else {
           if (failsReported < 2) {
