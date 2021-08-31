@@ -87,6 +87,11 @@ features = setdiff(names(featuresCoverage)[featuresCoverage >= param$minDataCove
 if (length(features) <= 1) { # 1 cause label is always there
   stop("No features extracted from the rasdaman. Either the training data is outside of the spatial and/or temporal domain of data available in the resdaman or rasdman doesn't work properly")
 }
+means = colMeans(trainData[, setdiff(features, 'label')], na.rm = TRUE)
+for (i in seq_along(means)) {
+  col = names(means)[i]
+  trainData[is.na(unlist(trainData[, col])), col] = means[col]
+}
 trainData$label = factor(trainData$label)
 task = mlr3::TaskClassif$new('task', target = 'label', backend = trainData[, features])
 if (length(features) > param$maxFeatures) {
