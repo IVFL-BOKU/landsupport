@@ -11,9 +11,10 @@ months2date = function(x, k = 1, end = FALSE) {
 }
 
 bands = c('B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B8A', 'B11', 'B12', 'SCL', 'LAI', 'TCI', 'FAPAR', 'FCOVER')
-monthMin = date2months('2020-04')
-monthMax = date2months('2020-05')
-S2_initialize_user('landsupport', 'CbYwN9cNvp')
+monthMin = date2months('2022-01')
+monthMax = date2months('2022-02')
+user = 'landsupport'
+S2_initialize_user(user, 'CbYwN9cNvp')
 roiEu = S2_query_roi(regionId = 'EU_cube')
 stopifnot(nrow(roiEu) == 1)
 
@@ -107,6 +108,16 @@ table(c('not wanted', 'wanted')[toAdd$wanted + 1L], c('roi', 'no roi')[is.na(toA
 toAdd = toAdd %>%
   filter(wanted & is.na(regionId))
 
+sql = c(
+  paste0("INSERT INTO regions_of_interest (user_id, region_id, granule_id, cloud_tresh) VALUES ('", user, "', 'granule_", toAdd$granuleId, "', ", toAdd$granuleId, ", null);"),
+  paste0("INSERT INTO regions_of_interest_job_types (user_id, region_id, job_type_id) VALUES ('", user, "', 'granule_", toAdd$granuleId, "', 'atmCorr');"),
+  paste0("INSERT INTO regions_of_interest_job_types (user_id, region_id, job_type_id) VALUES ('", user, "', 'granule_", toAdd$granuleId, "', 'LAI');"),
+  paste0("INSERT INTO regions_of_interest_job_types (user_id, region_id, job_type_id) VALUES ('", user, "', 'granule_", toAdd$granuleId, "', 'FAPAR');"),
+  paste0("INSERT INTO regions_of_interest_job_types (user_id, region_id, job_type_id) VALUES ('", user, "', 'granule_", toAdd$granuleId, "', 'FCOVER');"),
+  paste0("INSERT INTO regions_of_interest_job_types (user_id, region_id, job_type_id) VALUES ('", user, "', 'granule_", toAdd$granuleId, "', 'albedo');"),
+  "insert into s2_granules_users select granule_id, user_id from regions_of_interest where user_id = 'landsupport' and granule_id is not null on conflict do nothing;"
+)
+writeLines(sql, "~/Pobrane/newRoi")
 save(toAdd, file = '~/Pulpit/cube.RData')
 load('~/Pulpit/cube.RData')
 for (j in seq_along(toAdd$granuleId)) {
