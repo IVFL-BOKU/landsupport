@@ -2,7 +2,7 @@
 
 import argparse
 import datetime
-from osgeo from osgeo import gdal
+from osgeo import gdal
 import itertools
 import logging
 import math

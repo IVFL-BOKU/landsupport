@@ -2,10 +2,10 @@
 
 import argparse
 import datetime
-from osgeo from osgeo import gdal
+from osgeo import gdal
 import math
 import multiprocessing
-import ogr
+from osgeo import ogr
 import os
 import osr
 
