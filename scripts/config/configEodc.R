@@ -36,7 +36,7 @@ dwnldMethod = 'symlink'
 # maximum accepted local files to be deleted during the download (to avoid hitting own foot)
 dwnldMaxRemovals = 10000
 # s2.boku.eodc.eu database connection paramerters required for the "symlink" download method
-dwnldDbParam = list(host = '10.250.16.131', port = 5432, user = 'eodc', dbname = 'bokudata')
+dwnldDbParam = list(host = '10.250.16.137', port = 5432, user = 'eodc', dbname = 'bokudata')
 ## parameters required for the "download" download method
 # number of parallel downloads
 dwnldNCores = 4

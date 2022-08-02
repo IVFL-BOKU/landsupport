@@ -11,12 +11,12 @@ acubeLogsDir = '/eodc/private/boku/ACube_logs'
 
 bands = c('B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B8A', 'B11', 'B12', 'TCI', 'LAI', 'FAPAR', 'FCOVER', 'SCL')
 cloudCov = 0.5
-nCores = 40
+nCores = 12
 chunksPerCore = 10
 
 dwnldMethod = 'symlink'
 dwnldMaxRemovals = 200
-dwnldDbParam = list(host = '10.250.16.131', port = 5432, user = 'eodc', dbname = 'bokudata')
+dwnldDbParam = list(host = '10.250.16.137', port = 5432, user = 'eodc', dbname = 'bokudata')
 dwnldNCores = 4
 dwnldTimeout = 120
 dwnldSkipExisting = 'samesize'
