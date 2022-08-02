@@ -29,7 +29,7 @@ if not os.path.exists(args.targetDir):
     os.makedirs(args.targetDir, 0o770)
 
 ext = None
-try: import gdal
+try: from osgeo from osgeo import gdal
 except: ext = '.tif'
 
 utms = os.listdir(args.dataDir)
